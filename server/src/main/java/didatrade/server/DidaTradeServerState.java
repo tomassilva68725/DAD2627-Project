@@ -16,6 +16,7 @@ import io.grpc.ManagedChannelBuilder;
 
 public class DidaTradeServerState {
     public static final int     DEFAULT_POPULATION = 10;
+	public static final int     SLOW_MAX_DELAY_MS = 1000;
     int                         max_participants;
     TradeManager                trade_manager;
     ConfigurationScheduler      scheduler;
@@ -184,6 +185,16 @@ public class DidaTradeServerState {
 			try {
 				wait();
 			} catch (InterruptedException e) {
+			}
+		}
+	}
+
+	public void debugGate(){
+		this.waitIfFrozen();
+		if(this.isSlow()){
+			try {
+				Thread.sleep((long) (Math.random() * SLOW_MAX_DELAY_MS));
+		    } catch (InterruptedException e) {
 			}
 		}
 	}
