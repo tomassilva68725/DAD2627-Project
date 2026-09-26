@@ -16,6 +16,7 @@ import io.grpc.ManagedChannelBuilder;
 
 public class DidaTradeServerState {
     public static final int     DEFAULT_POPULATION = 10;
+	public static final int     SLOW_MAX_DELAY_MS = 1000;
     int                         max_participants;
     TradeManager                trade_manager;
     ConfigurationScheduler      scheduler;
@@ -34,6 +35,8 @@ public class DidaTradeServerState {
     private int                 completed_ballot;
     private int                 debug_mode;
     private boolean             fastpaxos_on;
+	private boolean             frozen_on;
+	private boolean             slow_on;
  
     MainLoop                    main_loop;
     Thread                      main_loop_worker;
@@ -50,6 +53,8 @@ public class DidaTradeServerState {
 	this.req_history      = new RequestHistory();
 	this.paxos_log        = new PaxosLog();
 	this.main_loop        = new MainLoop(this);
+	this.frozen_on        = false;
+	this.slow_on 		  = false;
 
 	// populate manager
 	this.trade_manager.populate(DEFAULT_POPULATION);
@@ -155,4 +160,42 @@ public class DidaTradeServerState {
 	this.debug_mode = mode;
     }
 
+	public synchronized boolean isFrozen() {
+		return this.frozen_on;
+	}
+
+	public synchronized void setFrozen(boolean frozen_value) {
+		this.frozen_on = frozen_value;
+		if(!frozen_value){
+			this.notifyAll();	
+		}
+		
+	}
+
+	public synchronized boolean isSlow() {
+		return this.slow_on;
+	}
+
+	public synchronized void setSlow(boolean slow_value) {
+		this.slow_on = slow_value;
+	}
+
+	public synchronized void waitIfFrozen() {
+		while (this.frozen_on) {
+			try {
+				wait();
+			} catch (InterruptedException e) {
+			}
+		}
+	}
+
+	public void debugGate(){
+		this.waitIfFrozen();
+		if(this.isSlow()){
+			try {
+				Thread.sleep((long) (500 + (Math.random() * SLOW_MAX_DELAY_MS)));
+		    } catch (InterruptedException e) {
+			}
+		}
+	}
 }

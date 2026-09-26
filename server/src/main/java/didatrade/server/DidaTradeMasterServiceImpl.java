@@ -2,6 +2,7 @@ package didatrade.server;
 
 import didatrade.DidaTradeMaster;
 import didatrade.DidaTradeMasterServiceGrpc;
+import didatrade.util.DebugMode;
 
 import io.grpc.stub.StreamObserver;
 
@@ -75,10 +76,46 @@ public class DidaTradeMasterServiceImpl extends DidaTradeMasterServiceGrpc.DidaT
 	boolean response_value = true;
 
 	int request_id   = request.getReqid();
-	this.server_state.setDebugMode (request.getMode());
+	
+	DebugMode mode;
+	try {
+		mode = DebugMode.fromCode(request.getMode());
+	} catch (IllegalArgumentException e) {
+		System.out.println("Invalid debug mode code: " + request.getMode());
+		response_value = false;
+		DidaTradeMaster.SetDebugReply reply = DidaTradeMaster.SetDebugReply.newBuilder()
+			.setReqid(request_id)
+			.setAck(response_value)
+			.build();
+		responseObserver.onNext(reply);
+		responseObserver.onCompleted();
+		return;
+	}
 
 	// for debug purposes
-	System.out.println("Setting debug mode to = " + this.server_state.getDebugMode());
+	System.out.println("Setting debug mode to = " + mode);
+
+	switch (mode) {
+	    case CRASH:
+			Runtime.getRuntime().halt(1);
+		break;
+	    case FREEZE:
+			this.server_state.setFrozen(true);
+		break;
+	    case UNFREEZE:
+			this.server_state.setFrozen(false);
+		break;
+	    case SLOW_ON:
+			this.server_state.setSlow(true);
+		break;
+	    case SLOW_OFF:
+			this.server_state.setSlow(false);
+		break;
+	    default:
+			System.out.println("Invalid debug mode code: " + request.getMode());
+			response_value = false;
+		break;
+	}
 
 	DidaTradeMaster.SetDebugReply.Builder response_builder = DidaTradeMaster.SetDebugReply.newBuilder();
 	response_builder.setReqid(request_id);
