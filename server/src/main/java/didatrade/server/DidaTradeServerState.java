@@ -193,7 +193,7 @@ public class DidaTradeServerState {
 		this.waitIfFrozen();
 		if(this.isSlow()){
 			try {
-				Thread.sleep((long) (Math.random() * SLOW_MAX_DELAY_MS));
+				Thread.sleep((long) (500 + (Math.random() * SLOW_MAX_DELAY_MS)));
 		    } catch (InterruptedException e) {
 			}
 		}
