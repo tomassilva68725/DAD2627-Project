@@ -40,7 +40,7 @@ public class RequestHistory {
     public synchronized RequestRecord takeFirstPending() {
         Integer id = this.pending_req_ids_queue.poll();
         if (id != null) {
-            return this.pending.remove(id);
+            return this.pending.get(id);
         } else {
             return null;
         }

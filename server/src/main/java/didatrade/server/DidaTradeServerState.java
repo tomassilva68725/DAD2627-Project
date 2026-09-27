@@ -40,7 +40,10 @@ public class DidaTradeServerState {
  
     MainLoop                    main_loop;
     Thread                      main_loop_worker;
+	Applier					 	applier;
+	Thread					    applier_worker;
     
+
     public DidaTradeServerState(int port, int myself, char schedule) {
 	this.trade_manager    = new TradeManager();
 	this.scheduler        = new ConfigurationScheduler (schedule);
@@ -55,6 +58,9 @@ public class DidaTradeServerState {
 	this.main_loop        = new MainLoop(this);
 	this.frozen_on        = false;
 	this.slow_on 		  = false;
+	this.applier 		  = new Applier(this);
+	this.applier_worker   = new Thread(this.applier);
+	applier_worker.start();
 
 	// populate manager
 	this.trade_manager.populate(DEFAULT_POPULATION);
