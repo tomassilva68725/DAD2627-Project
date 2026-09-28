@@ -68,6 +68,10 @@ public class MainLoop implements Runnable  {
 	}
 
 	private int allocateNextInstance() {
+		int log_length = server_state.paxos_log.getLength();
+		if (log_length - 1 > this.next_log_entry.get()) {
+			this.next_log_entry.set(log_length - 1);
+		}
 		return this.next_log_entry.incrementAndGet();
 	}
       
