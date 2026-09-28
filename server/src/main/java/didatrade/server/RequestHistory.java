@@ -72,6 +72,7 @@ public class RequestHistory {
 	Integer id = new Integer(requestid);
         RequestRecord record = this.pending.remove(id);
 	this.processed.put (id, record);
+    this.pending_req_ids_queue.remove(id);
 	return record;
     }
    

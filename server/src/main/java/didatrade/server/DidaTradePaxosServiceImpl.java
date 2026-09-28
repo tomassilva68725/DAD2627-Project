@@ -158,7 +158,7 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
                 	entry.decided = true;
                 }
             	entry.notifyAll();
-            }
+        	}
 		}
 	    }
 	    else if (ballot > entry.accept_ballot) {

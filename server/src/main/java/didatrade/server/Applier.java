@@ -20,18 +20,22 @@ public class Applier implements Runnable {
                     } catch (InterruptedException e) {}
                 }
             }
-
-        RequestRecord request_record = server_state.req_history.getIfPending(entry.command_id);
-        while (request_record == null) {
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {}
-            request_record = server_state.req_history.getIfPending(entry.command_id);
-        }
-        
-        executeCommand(request_record);
-        server_state.req_history.moveToProcessed(request_record.getId());
+        applyEntry(entry.command_id);
         this.next_apply++;
+        }
+    }
+
+    private void applyEntry(int command_id) {
+        while(server_state.req_history.getIfProcessed(command_id) == null) {
+            RequestRecord request_record = server_state.req_history.getIfPending(command_id);
+            if (request_record != null) {
+                executeCommand(request_record);
+                server_state.req_history.moveToProcessed(command_id);
+                return;
+            }
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException e) {}
         }
     }
     
