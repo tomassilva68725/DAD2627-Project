@@ -1,17 +1,23 @@
 package didatrade.server;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 public class Applier implements Runnable {
     private DidaTradeServerState server_state;
-    private int next_apply;
+    private AtomicInteger next_apply;
 
     public Applier(DidaTradeServerState state) {
         this.server_state = state;
-        this.next_apply   = 0;
+        this.next_apply   = new AtomicInteger(0);
+    }
+
+    public int getNextApply() {
+        return this.next_apply.get();
     }
 
     public void run() {
         while (true){
-            PaxosInstance entry = server_state.paxos_log.testAndSetEntry(this.next_apply);
+            PaxosInstance entry = server_state.paxos_log.testAndSetEntry(this.next_apply.get());
         
             synchronized (entry) {
                 while (!entry.decided) {
@@ -21,7 +27,7 @@ public class Applier implements Runnable {
                 }
             }
         applyEntry(entry.command_id);
-        this.next_apply++;
+        this.next_apply.incrementAndGet();
         }
     }
 

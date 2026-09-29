@@ -76,8 +76,10 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 
 	if (ballot >= this.server_state.getCurrentBallot()) {
 	    accepted           = true;
-	    entry.command_id   = value;
-	    entry.write_ballot = ballot;
+	    synchronized (entry) {
+			entry.command_id   = value;
+	    	entry.write_ballot = ballot;
+		}
 	    this.server_state.setCurrentBallot(ballot);
 	}
 	else
