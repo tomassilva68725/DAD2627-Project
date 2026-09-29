@@ -44,7 +44,7 @@ public class Applier implements Runnable {
         } catch (InterruptedException e) {}
         }
     }
-    
+     
     private void executeCommand(RequestRecord request_record) {
         DidaTradeCommand command = request_record.getRequest();
         boolean result = false;
