@@ -58,13 +58,13 @@ public class MainLoop implements Runnable  {
     }
 
 	private synchronized void waitForWork() {
-		this.has_work = false;
 		while (!this.has_work) {
 			try {
 				wait();
 			} catch (InterruptedException e) {
 			}
 		}
+		this.has_work = false;
 	}
 
 	private int allocateNextInstance() {

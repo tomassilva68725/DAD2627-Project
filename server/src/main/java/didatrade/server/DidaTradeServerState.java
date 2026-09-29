@@ -33,6 +33,7 @@ public class DidaTradeServerState {
 
     private int                 current_ballot;
     private int                 completed_ballot;
+		private int 								prepared_ballot;
     private int                 debug_mode;
     private boolean             fastpaxos_on;
 	private boolean             frozen_on;
@@ -53,6 +54,7 @@ public class DidaTradeServerState {
 	this.fastpaxos_on     = false;
 	this.current_ballot   = 0;
 	this.completed_ballot = -1;
+	this.prepared_ballot  = -1;
 	this.req_history      = new RequestHistory();
 	this.paxos_log        = new PaxosLog();
 	this.main_loop        = new MainLoop(this);
@@ -94,14 +96,25 @@ public class DidaTradeServerState {
 	return this.current_ballot;
     }
     
-    public synchronized void setCurrentBallot (int ballot) {
-	if (ballot > this.current_ballot)
-	    this.current_ballot = ballot;
-    }
+  public synchronized void setCurrentBallot (int ballot) {
+		if (ballot > this.current_ballot)
+	  	this.current_ballot = ballot;
+  }
 
-    public synchronized int getCompletedBallot () {
-	return this.completed_ballot;
-    }
+  public synchronized int getCompletedBallot () {
+		return this.completed_ballot;
+  }
+
+
+	public synchronized boolean isPreparedFor(int ballot) {
+		return (this.prepared_ballot == ballot);
+	}
+
+	public synchronized void markPrepared(int ballot) {
+		if (ballot > this.prepared_ballot)
+			this.prepared_ballot = ballot;
+	}
+
 
     public int findMaxDecidedBallot () {
 	int ballot = -1;
@@ -202,6 +215,7 @@ public class DidaTradeServerState {
 				Thread.sleep((long) (500 + (Math.random() * SLOW_MAX_DELAY_MS)));
 		    } catch (InterruptedException e) {
 			}
+			this.waitIfFrozen();
 		}
 	}
 }

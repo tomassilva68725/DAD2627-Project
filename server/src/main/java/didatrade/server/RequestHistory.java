@@ -45,6 +45,15 @@ public class RequestHistory {
             return null;
         }
     }
+
+    /**
+     * 
+     */
+    public synchronized void requeue(int requestid) {
+        Integer id = new Integer(requestid);
+        if (this.pending.containsKey(id) && !this.pending_req_ids_queue.contains(id))
+            this.pending_req_ids_queue.addFirst(id);
+    }
    
     public synchronized RequestRecord getIfProcessed(int requestid) {
 	Integer id = new Integer(requestid);

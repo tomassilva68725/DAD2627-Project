@@ -29,45 +29,57 @@ public class InstanceWorker implements Runnable {
 
             if(server_state.scheduler.leader(ballot) != server_state.my_id) {
                 // Not the leader
+                giveBackRequest();
                 return;
             }
 
-            int completed_ballot = server_state.getCompletedBallot();
             List<Integer> acceptors = server_state.scheduler.acceptors(ballot);
             int quorum = server_state.scheduler.quorum(ballot);
             int n_acceptors = acceptors.size();
 
             int value = this.request.getId();
+            boolean adopted = false;
 
-            System.out.println("[" + System.currentTimeMillis() + "] Instance " + this.instance + ": starting phase 1 with ballot " + ballot);
+            //Phase 1 (only once per ballot: multi-paxos)
+            if (!server_state.isPreparedFor(ballot)) {
+            
+                System.out.println("[" + System.currentTimeMillis() + "] Instance " + this.instance + ": starting phase 1 with ballot " + ballot);
 
-            //Phase 1
-            DidaTradePaxos.PhaseOneRequest.Builder phase_one_request_builder = DidaTradePaxos.PhaseOneRequest.newBuilder();
-            phase_one_request_builder.setInstance(this.instance);
-            phase_one_request_builder.setRequestballot(ballot);
-            DidaTradePaxos.PhaseOneRequest phase_one_request = phase_one_request_builder.build();
+                DidaTradePaxos.PhaseOneRequest.Builder phase_one_request_builder = DidaTradePaxos.PhaseOneRequest.newBuilder();
+                phase_one_request_builder.setInstance(this.instance);
+                phase_one_request_builder.setRequestballot(ballot);
+                DidaTradePaxos.PhaseOneRequest phase_one_request = phase_one_request_builder.build();
 
-            int low_ballot  = Math.max(completed_ballot, 0);
-            int high_ballot = ballot;
+                int completed_ballot = server_state.getCompletedBallot();
+                int low_ballot  = Math.max(completed_ballot, 0);
+                int high_ballot = ballot;
 
-            PhaseOneResponseProcessor phase_one_processor = new PhaseOneResponseProcessor(server_state.scheduler, low_ballot, high_ballot);
-            ArrayList<DidaTradePaxos.PhaseOneReply> phase_one_responses = new ArrayList<DidaTradePaxos.PhaseOneReply>();
-            GenericResponseCollector<DidaTradePaxos.PhaseOneReply> phase_one_collector =
-                new GenericResponseCollector<DidaTradePaxos.PhaseOneReply>(phase_one_responses, n_acceptors, phase_one_processor);
+                PhaseOneResponseProcessor phase_one_processor = new PhaseOneResponseProcessor(server_state.scheduler, low_ballot, high_ballot);
+                ArrayList<DidaTradePaxos.PhaseOneReply> phase_one_responses = new ArrayList<DidaTradePaxos.PhaseOneReply>();
+                GenericResponseCollector<DidaTradePaxos.PhaseOneReply> phase_one_collector =
+                    new GenericResponseCollector<DidaTradePaxos.PhaseOneReply>(phase_one_responses, n_acceptors, phase_one_processor);
 
-            for (int i = 0; i < n_acceptors; i++) {
-                CollectorStreamObserver<DidaTradePaxos.PhaseOneReply> phase_one_observer =
-                    new CollectorStreamObserver<DidaTradePaxos.PhaseOneReply>(phase_one_collector);
-                server_state.async_stubs[acceptors.get(i)].phaseone(phase_one_request, phase_one_observer);
+                for (int i = 0; i < n_acceptors; i++) {
+                    CollectorStreamObserver<DidaTradePaxos.PhaseOneReply> phase_one_observer =
+                        new CollectorStreamObserver<DidaTradePaxos.PhaseOneReply>(phase_one_collector);
+                    server_state.async_stubs[acceptors.get(i)].phaseone(phase_one_request, phase_one_observer);
+                }
+                phase_one_collector.waitUntilDone();
+
+                if (phase_one_processor.getAccepted() == false) {
+                    server_state.setCurrentBallot(phase_one_processor.getMaxballot());
+                    try { Thread.sleep(100); } catch (InterruptedException e) {}
+                    continue;
+                }
+                if (phase_one_processor.getValballot() > -1) {
+                    value = phase_one_processor.getValue();
+                    adopted = (value != this.request.getId());
+                }
+
+                server_state.markPrepared(ballot);
             }
-            phase_one_collector.waitUntilDone();
-
-            if (phase_one_processor.getAccepted() == false) {
-                server_state.setCurrentBallot(phase_one_processor.getMaxballot());
-                continue;
-            }
-            if (phase_one_processor.getValballot() > -1) {
-                value = phase_one_processor.getValue();
+            else{
+                System.out.println("[" + System.currentTimeMillis() + "] Instance " + this.instance + ": skipping phase 1, ballot " + ballot + " already prepared");
             }
 
             System.out.println("[" + System.currentTimeMillis() + "] Instance " + this.instance + ": phase 1 done, starting phase 2 with value " + value);
@@ -93,11 +105,16 @@ public class InstanceWorker implements Runnable {
 
             if (phase_two_processor.getAccepted() == false) {
                 server_state.setCurrentBallot(phase_two_processor.getMaxballot());
+                try { Thread.sleep(100); } catch (InterruptedException e) {}
                 continue;
             }
 
             System.out.println("[" + System.currentTimeMillis() + "] Instance " + this.instance + ": DECIDED with value " + value);
             markDecided(value);
+
+            if (adopted) 
+                giveBackRequest();
+
             decided = true;
         }
     }
@@ -111,5 +128,10 @@ public class InstanceWorker implements Runnable {
             }
             entry.notifyAll();
         }
+    }
+
+    private void giveBackRequest() {
+        server_state.req_history.requeue(this.request.getId());
+        server_state.main_loop.wakeup();
     }
 }
