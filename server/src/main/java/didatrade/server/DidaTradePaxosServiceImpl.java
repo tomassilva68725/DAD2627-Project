@@ -53,6 +53,7 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 	response_builder.setValue(value);
 	response_builder.setValballot(valballot);
 	response_builder.setMaxballot(maxballot);
+	response_builder.setMaxinstance(this.server_state.paxos_log.highestInstance());
 
 	DidaTradePaxos.PhaseOneReply response = response_builder.build();
 
