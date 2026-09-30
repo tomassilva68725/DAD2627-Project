@@ -33,8 +33,6 @@ public class RequestHistory {
 
     /**
      * Takes the first pending request and removes it from the pending list.
-     * btw, do not forget to save the request in a local variable at mainLoop
-     * because it will be removed from the pending list.
      * @return the first pending request record, or null if there are no pending requests
      */
     public synchronized RequestRecord takeFirstPending() {
@@ -46,9 +44,6 @@ public class RequestHistory {
         }
     }
 
-    /**
-     * 
-     */
     public synchronized void requeue(int requestid) {
         Integer id = new Integer(requestid);
         if (this.pending.containsKey(id) && !this.pending_req_ids_queue.contains(id))
