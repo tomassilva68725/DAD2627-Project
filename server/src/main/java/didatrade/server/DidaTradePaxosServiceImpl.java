@@ -165,15 +165,13 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 		entry.n_accepts++;
 		System.out.println("Paxos learner for instance " + instance + " : number of accepts " +  entry.n_accepts);
 		if (entry.n_accepts >= this.server_state.scheduler.quorum(ballot)) {
-		    System.out.println("Paxos learner: waking up the main loop");
-		    synchronized (entry) {
-            	if (!entry.decided) {
-                	this.server_state.updateCompletedBallot(ballot);
-                	entry.decided = true;
-                }
-            	entry.notifyAll();
-        	}
-		}
+    		System.out.println("Paxos learner: waking up the main loop");
+    		synchronized (entry) {
+        		entry.decided = true;
+        		entry.notifyAll();
+    	}
+    	this.server_state.updateCompletedBallot(ballot);
+		}	
 	    }
 	    else if (ballot > entry.accept_ballot) {
 		System.out.println("Paxos learner for instance " + instance + " : resetting ");

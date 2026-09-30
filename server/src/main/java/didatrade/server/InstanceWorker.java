@@ -44,7 +44,7 @@ public class InstanceWorker implements Runnable {
             int value = ownValue();
             boolean adopted = false;
 
-            //Phase 1 (only once per ballot: multi-paxos)
+        
             if (!server_state.canSkipPhaseOne(ballot, this.instance)) {
 
             
