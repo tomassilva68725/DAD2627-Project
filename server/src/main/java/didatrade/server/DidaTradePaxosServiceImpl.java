@@ -18,6 +18,9 @@ import io.grpc.Context;
 public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTradePaxosServiceImplBase {
     DidaTradeServerState server_state;
 
+	//lock for phases one and two, to avoid race conditions when multiple clients send requests to the same acceptor
+	private final Object acceptor_lock = new Object();
+
     public DidaTradePaxosServiceImpl(DidaTradeServerState state) {
 	this.server_state = state;
     }
@@ -32,16 +35,23 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 	int ballot            = request.getRequestballot();
 	PaxosInstance entry   = this.server_state.paxos_log.testAndSetEntry(instance, ballot);
 	boolean accepted      = false;
-	int  value            = entry.command_id;
-	int  valballot        = entry.write_ballot;
+	int  value;
+	int  valballot;
+	int  maxballot;
+	int  maxinstance;
 
-	if (ballot >= this.server_state.getCurrentBallot()) {
-	    accepted = true;
-	    this.server_state.setCurrentBallot(ballot);
-	    entry.read_ballot = ballot;
+	synchronized (this.acceptor_lock) {
+		value = entry.command_id;
+	    valballot = entry.write_ballot;
+		if (ballot >= this.server_state.getCurrentBallot()) {
+			accepted = true;
+			this.server_state.setCurrentBallot(ballot);
+			entry.read_ballot = ballot;
+		}
+
+		maxballot = this.server_state.getCurrentBallot();
+		maxinstance = this.server_state.paxos_log.highestInstance();
 	}
-
-	int maxballot = this.server_state.getCurrentBallot();
 
 	// System.out.println("Instance = " + instance + " ballot = " + ballot + " current_ballot = " + this.server_state.getCurrentBallot() + " val = " + value + " valballot = " + valballot + " maxballot = " + maxballot + " accepted = " + accepted);
 	
@@ -53,7 +63,7 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 	response_builder.setValue(value);
 	response_builder.setValballot(valballot);
 	response_builder.setMaxballot(maxballot);
-	response_builder.setMaxinstance(this.server_state.paxos_log.highestInstance());
+	response_builder.setMaxinstance(maxinstance);
 
 	DidaTradePaxos.PhaseOneReply response = response_builder.build();
 
@@ -75,17 +85,18 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 	boolean accepted      = false;
 	int  maxballot        = ballot;
 
-	if (ballot >= this.server_state.getCurrentBallot()) {
-	    accepted           = true;
-	    synchronized (entry) {
-			entry.command_id   = value;
-	    	entry.write_ballot = ballot;
+	synchronized (this.acceptor_lock) {
+		if (ballot >= this.server_state.getCurrentBallot()) {
+			accepted           = true;
+			synchronized (entry) {
+				entry.command_id   = value;
+				entry.write_ballot = ballot;
+			}
+			this.server_state.setCurrentBallot(ballot);
 		}
-	    this.server_state.setCurrentBallot(ballot);
-	}
-	else
-	    maxballot = this.server_state.getCurrentBallot();
-	
+		else
+			maxballot = this.server_state.getCurrentBallot();
+	}	
 
 	DidaTradePaxos.PhaseTwoReply.Builder response_builder = DidaTradePaxos.PhaseTwoReply.newBuilder();
 	response_builder.setAccepted(accepted);
