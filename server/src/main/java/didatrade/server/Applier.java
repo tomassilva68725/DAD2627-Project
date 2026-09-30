@@ -17,6 +17,7 @@ public class Applier implements Runnable {
 
     public void run() {
         while (true){
+            this.server_state.waitIfFrozen();
             PaxosInstance entry = server_state.paxos_log.testAndSetEntry(this.next_apply.get());
         
             synchronized (entry) {

@@ -28,6 +28,7 @@ public class InstanceWorker implements Runnable {
         boolean decided = false;
 
         while (!decided) {
+            this.server_state.waitIfFrozen();
             int ballot = this.server_state.getCurrentBallot();
 
             if(server_state.scheduler.leader(ballot) != server_state.my_id) {

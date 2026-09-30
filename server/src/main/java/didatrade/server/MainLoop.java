@@ -39,6 +39,7 @@ public class MainLoop implements Runnable  {
 
     public void run() {
 	while (true) {
+		this.server_state.waitIfFrozen();
 		int ballot = this.server_state.getCurrentBallot();
 
 		if (server_state.scheduler.leader(ballot) != this.server_state.my_id) {
