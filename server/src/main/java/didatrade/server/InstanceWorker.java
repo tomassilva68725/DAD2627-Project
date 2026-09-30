@@ -13,11 +13,14 @@ public class InstanceWorker implements Runnable {
     private DidaTradeServerState server_state;
     private int instance;
     private RequestRecord request;
+    private int learned_max_instance;
+    public static final int NO_OP = -1;
 
     public InstanceWorker(DidaTradeServerState state, int instance, RequestRecord request) {
         this.server_state = state;
         this.instance     = instance;
         this.request      = request;
+        this.learned_max_instance = -1;
     }
 
 
@@ -37,11 +40,12 @@ public class InstanceWorker implements Runnable {
             int quorum = server_state.scheduler.quorum(ballot);
             int n_acceptors = acceptors.size();
 
-            int value = this.request.getId();
+            int value = ownValue();
             boolean adopted = false;
 
             //Phase 1 (only once per ballot: multi-paxos)
-            if (!server_state.isPreparedFor(ballot)) {
+            if (!server_state.canSkipPhaseOne(ballot, this.instance)) {
+
             
                 System.out.println("[" + System.currentTimeMillis() + "] Instance " + this.instance + ": starting phase 1 with ballot " + ballot);
 
@@ -71,12 +75,13 @@ public class InstanceWorker implements Runnable {
                     try { Thread.sleep(100); } catch (InterruptedException e) {}
                     continue;
                 }
+
+                this.learned_max_instance = phase_one_processor.getMaxInstance();
+
                 if (phase_one_processor.getValballot() > -1) {
                     value = phase_one_processor.getValue();
-                    adopted = (value != this.request.getId());
+                    adopted = (value != ownValue());
                 }
-
-                server_state.markPrepared(ballot);
             }
             else{
                 System.out.println("[" + System.currentTimeMillis() + "] Instance " + this.instance + ": skipping phase 1, ballot " + ballot + " already prepared");
@@ -131,7 +136,17 @@ public class InstanceWorker implements Runnable {
     }
 
     private void giveBackRequest() {
+        if (this.request == null)
+            return;
         server_state.req_history.requeue(this.request.getId());
         server_state.main_loop.wakeup();
+    }
+
+    public int getLearnedMaxInstance(){
+        return this.learned_max_instance;
+    }
+
+    private int ownValue() {
+        return (this.request != null) ? this.request.getId() : NO_OP;
     }
 }

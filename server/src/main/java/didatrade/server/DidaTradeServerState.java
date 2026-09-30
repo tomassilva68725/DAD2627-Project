@@ -33,9 +33,10 @@ public class DidaTradeServerState {
 
     private int                 current_ballot;
     private int                 completed_ballot;
-		private int 								prepared_ballot;
+	private int 				prepared_ballot;
     private int                 debug_mode;
-    private boolean             fastpaxos_on;
+	private int 			    safe_skip_from;
+	private boolean             fastpaxos_on;
 	private boolean             frozen_on;
 	private boolean             slow_on;
  
@@ -55,6 +56,7 @@ public class DidaTradeServerState {
 	this.current_ballot   = 0;
 	this.completed_ballot = -1;
 	this.prepared_ballot  = -1;
+	this.safe_skip_from   = Integer.MAX_VALUE;
 	this.req_history      = new RequestHistory();
 	this.paxos_log        = new PaxosLog();
 	this.main_loop        = new MainLoop(this);
@@ -110,9 +112,15 @@ public class DidaTradeServerState {
 		return (this.prepared_ballot == ballot);
 	}
 
-	public synchronized void markPrepared(int ballot) {
-		if (ballot > this.prepared_ballot)
+	public synchronized void markPrepared(int ballot, int from_instance) {
+		if (ballot > this.prepared_ballot){
 			this.prepared_ballot = ballot;
+			this.safe_skip_from = from_instance;
+		}
+	}
+
+	public synchronized boolean canSkipPhaseOne(int ballot, int instance) {
+		return (this.prepared_ballot == ballot && instance >= this.safe_skip_from);
 	}
 
 

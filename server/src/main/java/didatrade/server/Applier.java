@@ -32,6 +32,10 @@ public class Applier implements Runnable {
     }
 
     private void applyEntry(int command_id) {
+        if(command_id == InstanceWorker.NO_OP) {
+            return;
+        }
+        
         while(server_state.req_history.getIfProcessed(command_id) == null) {
             RequestRecord request_record = server_state.req_history.getIfPending(command_id);
             if (request_record != null) {
