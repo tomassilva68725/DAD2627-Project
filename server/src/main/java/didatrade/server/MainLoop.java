@@ -47,6 +47,10 @@ public class MainLoop implements Runnable  {
 		}
 
 		if(!server_state.isPreparedFor(ballot)){
+			if (ballot == 0 && this.server_state.req_history.getFirstPending() == null) {
+				waitForWork();
+				continue;
+			}
 			takeOverAsLeader(ballot);
 			continue;
 		}
