@@ -17,6 +17,7 @@ public class PhaseOneResponseProcessor extends GenericResponseProcessor<DidaTrad
     private int                      maxballot;
     private int                      low_ballot;   
     private int                      high_ballot;
+	private int 	                 max_instance;
 
     public PhaseOneResponseProcessor (ConfigurationScheduler s, int l, int h) {
 	this.promises    = new HashSet<Integer>();
@@ -25,6 +26,7 @@ public class PhaseOneResponseProcessor extends GenericResponseProcessor<DidaTrad
 	this.value       = -1;
 	this.valballot   = -1;
 	this.maxballot   = -1;
+	this.max_instance = -1;
 	this.low_ballot  = l;
 	this.high_ballot = h;
 	this.scheduler   = s;
@@ -46,6 +48,10 @@ public class PhaseOneResponseProcessor extends GenericResponseProcessor<DidaTrad
 	return this.maxballot;
     }
 
+	public synchronized int getMaxInstance() {
+		return this.max_instance;
+	}
+
     public synchronized boolean onNext(ArrayList<DidaTradePaxos.PhaseOneReply> all_responses, DidaTradePaxos.PhaseOneReply last_response) {
 	
 	if (last_response.getMaxballot() > this.maxballot)
@@ -58,6 +64,10 @@ public class PhaseOneResponseProcessor extends GenericResponseProcessor<DidaTrad
 	}
 
 	this.promises.add(last_response.getServerid());
+
+	if (last_response.getMaxinstance() > this.max_instance) {
+		this.max_instance = last_response.getMaxinstance();
+	}
 
 	if (last_response.getValballot() > this.valballot) {
 	    this.valballot = last_response.getValballot();

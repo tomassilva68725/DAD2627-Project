@@ -19,7 +19,7 @@ public class PhaseTwoResponseProcessor extends GenericResponseProcessor<DidaTrad
     }
 
     public boolean getAccepted() {
-	return this.accepted;
+	return (this.accepted && this.responses >= this.quorum);
     }
     
     public int getMaxballot() {
@@ -27,14 +27,14 @@ public class PhaseTwoResponseProcessor extends GenericResponseProcessor<DidaTrad
     }
     
     public synchronized boolean onNext(ArrayList<DidaTradePaxos.PhaseTwoReply> all_responses, DidaTradePaxos.PhaseTwoReply last_response){
-	this.responses++;
 	if (last_response.getAccepted() == false) {
 	    this.accepted = false;
 	    if (last_response.getMaxballot() > this.maxballot)
 		this.maxballot = last_response.getMaxballot();
 	    return true;
 	}
-	else if (responses >= quorum)
+	this.responses++;
+	if (responses >= quorum)
 	    return true;
 	else
 	    return false;

@@ -39,4 +39,14 @@ public class PaxosLog {
 	}
 	return entry;
     }
+
+    public synchronized int highestInstance() {
+        int max = -1;
+        for (Integer key : this.log.keySet()) {
+            if (key > max) {
+                max = key;
+            }
+        }
+        return max;
+    }
 }

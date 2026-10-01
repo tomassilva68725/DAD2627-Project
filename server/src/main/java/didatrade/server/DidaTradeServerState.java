@@ -33,14 +33,19 @@ public class DidaTradeServerState {
 
     private int                 current_ballot;
     private int                 completed_ballot;
+	private int 				prepared_ballot;
     private int                 debug_mode;
-    private boolean             fastpaxos_on;
+	private int 			    safe_skip_from;
+	private boolean             fastpaxos_on;
 	private boolean             frozen_on;
 	private boolean             slow_on;
  
     MainLoop                    main_loop;
     Thread                      main_loop_worker;
+	Applier					 	applier;
+	Thread					    applier_worker;
     
+
     public DidaTradeServerState(int port, int myself, char schedule) {
 	this.trade_manager    = new TradeManager();
 	this.scheduler        = new ConfigurationScheduler (schedule);
@@ -50,11 +55,16 @@ public class DidaTradeServerState {
 	this.fastpaxos_on     = false;
 	this.current_ballot   = 0;
 	this.completed_ballot = -1;
+	this.prepared_ballot  = -1;
+	this.safe_skip_from   = Integer.MAX_VALUE;
 	this.req_history      = new RequestHistory();
 	this.paxos_log        = new PaxosLog();
 	this.main_loop        = new MainLoop(this);
 	this.frozen_on        = false;
 	this.slow_on 		  = false;
+	this.applier 		  = new Applier(this);
+	this.applier_worker   = new Thread(this.applier);
+	applier_worker.start();
 
 	// populate manager
 	this.trade_manager.populate(DEFAULT_POPULATION);
@@ -88,14 +98,31 @@ public class DidaTradeServerState {
 	return this.current_ballot;
     }
     
-    public synchronized void setCurrentBallot (int ballot) {
-	if (ballot > this.current_ballot)
-	    this.current_ballot = ballot;
-    }
+  public synchronized void setCurrentBallot (int ballot) {
+		if (ballot > this.current_ballot)
+	  	this.current_ballot = ballot;
+  }
 
-    public synchronized int getCompletedBallot () {
-	return this.completed_ballot;
-    }
+  public synchronized int getCompletedBallot () {
+		return this.completed_ballot;
+  }
+
+
+	public synchronized boolean isPreparedFor(int ballot) {
+		return (this.prepared_ballot == ballot);
+	}
+
+	public synchronized void markPrepared(int ballot, int from_instance) {
+		if (ballot > this.prepared_ballot){
+			this.prepared_ballot = ballot;
+			this.safe_skip_from = from_instance;
+		}
+	}
+
+	public synchronized boolean canSkipPhaseOne(int ballot, int instance) {
+		return (this.prepared_ballot == ballot && instance >= this.safe_skip_from);
+	}
+
 
     public int findMaxDecidedBallot () {
 	int ballot = -1;
@@ -196,6 +223,7 @@ public class DidaTradeServerState {
 				Thread.sleep((long) (500 + (Math.random() * SLOW_MAX_DELAY_MS)));
 		    } catch (InterruptedException e) {
 			}
+			this.waitIfFrozen();
 		}
 	}
 }
