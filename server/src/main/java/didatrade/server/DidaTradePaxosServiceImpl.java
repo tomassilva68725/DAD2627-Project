@@ -18,7 +18,7 @@ import io.grpc.Context;
 public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTradePaxosServiceImplBase {
     DidaTradeServerState server_state;
 
-	//lock for phases one and two, to avoid race conditions when multiple clients send requests to the same acceptor
+
 	private final Object acceptor_lock = new Object();
 
     public DidaTradePaxosServiceImpl(DidaTradeServerState state) {
@@ -33,45 +33,35 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 
 	int instance          = request.getInstance();
 	int ballot            = request.getRequestballot();
-	PaxosInstance entry   = this.server_state.paxos_log.testAndSetEntry(instance, ballot);
 	boolean accepted      = false;
-	int  value;
-	int  valballot;
 	int  maxballot;
-	int  maxinstance;
 
+	List<DidaTradePaxos.AcceptedEntry> entries = null;
 	synchronized (this.acceptor_lock) {
-		value = entry.command_id;
-	    valballot = entry.write_ballot;
 		if (ballot >= this.server_state.getCurrentBallot()) {
 			accepted = true;
 			this.server_state.setCurrentBallot(ballot);
-			entry.read_ballot = ballot;
+			entries = this.server_state.paxos_log.acceptedFrom(instance);
 		}
-
 		maxballot = this.server_state.getCurrentBallot();
-		maxinstance = this.server_state.paxos_log.highestInstance();
 	}
 
-	// System.out.println("Instance = " + instance + " ballot = " + ballot + " current_ballot = " + this.server_state.getCurrentBallot() + " val = " + value + " valballot = " + valballot + " maxballot = " + maxballot + " accepted = " + accepted);
-	
 	DidaTradePaxos.PhaseOneReply.Builder response_builder = DidaTradePaxos.PhaseOneReply.newBuilder();
-	response_builder.setInstance(instance);
 	response_builder.setServerid(this.server_state.my_id);
 	response_builder.setRequestballot(ballot);
 	response_builder.setAccepted(accepted);
-	response_builder.setValue(value);
-	response_builder.setValballot(valballot);
 	response_builder.setMaxballot(maxballot);
-	response_builder.setMaxinstance(maxinstance);
+	if (entries != null)
+		response_builder.addAllEntries(entries);
 
 	DidaTradePaxos.PhaseOneReply response = response_builder.build();
 
 	// System.out.println("Sending phase1 response: " + response);
-	
+
 	responseObserver.onNext(response);
 	responseObserver.onCompleted();
     }
+
 
     @Override
     public void phasetwo(DidaTradePaxos.PhaseTwoRequest request, StreamObserver<DidaTradePaxos.PhaseTwoReply> responseObserver) {

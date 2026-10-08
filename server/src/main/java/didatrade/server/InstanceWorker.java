@@ -6,21 +6,24 @@ import java.util.List;
 import didatrade.DidaTradePaxos;
 import didatrade.util.GenericResponseCollector;
 import didatrade.util.CollectorStreamObserver;
-import didatrade.util.PhaseOneResponseProcessor;
 import didatrade.util.PhaseTwoResponseProcessor;
 
 public class InstanceWorker implements Runnable {
     private DidaTradeServerState server_state;
     private int instance;
     private RequestRecord request;
-    private int learned_max_instance;
+    private int forced_value;
     public static final int NO_OP = -1;
 
     public InstanceWorker(DidaTradeServerState state, int instance, RequestRecord request) {
+        this(state, instance, request, NO_OP);
+    }
+
+    public InstanceWorker(DidaTradeServerState state, int instance, RequestRecord request, int forced_value) {
         this.server_state = state;
         this.instance     = instance;
         this.request      = request;
-        this.learned_max_instance = -1;
+        this.forced_value = forced_value;
     }
 
 
@@ -37,58 +40,19 @@ public class InstanceWorker implements Runnable {
                 return;
             }
 
+            if (!server_state.isPreparedFor(ballot)) {
+                // ballot mudou e ainda ninguém fez fase 1 para ele: o MainLoop trata disso
+                giveBackRequest();
+                return;
+            }
+
             List<Integer> acceptors = server_state.scheduler.acceptors(ballot);
             int quorum = server_state.scheduler.quorum(ballot);
             int n_acceptors = acceptors.size();
 
             int value = ownValue();
-            boolean adopted = false;
 
-        
-            if (!server_state.canSkipPhaseOne(ballot, this.instance)) {
-
-            
-                System.out.println("[" + System.currentTimeMillis() + "] Instance " + this.instance + ": starting phase 1 with ballot " + ballot);
-
-                DidaTradePaxos.PhaseOneRequest.Builder phase_one_request_builder = DidaTradePaxos.PhaseOneRequest.newBuilder();
-                phase_one_request_builder.setInstance(this.instance);
-                phase_one_request_builder.setRequestballot(ballot);
-                DidaTradePaxos.PhaseOneRequest phase_one_request = phase_one_request_builder.build();
-
-                int completed_ballot = server_state.getCompletedBallot();
-                int low_ballot  = Math.max(completed_ballot, 0);
-                int high_ballot = ballot;
-
-                PhaseOneResponseProcessor phase_one_processor = new PhaseOneResponseProcessor(server_state.scheduler, low_ballot, high_ballot);
-                ArrayList<DidaTradePaxos.PhaseOneReply> phase_one_responses = new ArrayList<DidaTradePaxos.PhaseOneReply>();
-                GenericResponseCollector<DidaTradePaxos.PhaseOneReply> phase_one_collector =
-                    new GenericResponseCollector<DidaTradePaxos.PhaseOneReply>(phase_one_responses, n_acceptors, phase_one_processor);
-
-                for (int i = 0; i < n_acceptors; i++) {
-                    CollectorStreamObserver<DidaTradePaxos.PhaseOneReply> phase_one_observer =
-                        new CollectorStreamObserver<DidaTradePaxos.PhaseOneReply>(phase_one_collector);
-                    server_state.async_stubs[acceptors.get(i)].phaseone(phase_one_request, phase_one_observer);
-                }
-                phase_one_collector.waitUntilDone();
-
-                if (phase_one_processor.getAccepted() == false) {
-                    server_state.setCurrentBallot(phase_one_processor.getMaxballot());
-                    try { Thread.sleep(100); } catch (InterruptedException e) {}
-                    continue;
-                }
-
-                this.learned_max_instance = phase_one_processor.getMaxInstance();
-
-                if (phase_one_processor.getValballot() > -1) {
-                    value = phase_one_processor.getValue();
-                    adopted = (value != ownValue());
-                }
-            }
-            else{
-                System.out.println("[" + System.currentTimeMillis() + "] Instance " + this.instance + ": skipping phase 1, ballot " + ballot + " already prepared");
-            }
-
-            System.out.println("[" + System.currentTimeMillis() + "] Instance " + this.instance + ": phase 1 done, starting phase 2 with value " + value);
+            System.out.println("[" + System.currentTimeMillis() + "] Instance " + this.instance + ": starting phase 2 with value " + value + " ballot " + ballot);
 
             //Phase 2
             DidaTradePaxos.PhaseTwoRequest.Builder phase_two_request_builder = DidaTradePaxos.PhaseTwoRequest.newBuilder();
@@ -118,9 +82,6 @@ public class InstanceWorker implements Runnable {
             System.out.println("[" + System.currentTimeMillis() + "] Instance " + this.instance + ": DECIDED with value " + value);
             markDecided(value);
 
-            if (adopted) 
-                giveBackRequest();
-
             decided = true;
         }
     }
@@ -143,11 +104,7 @@ public class InstanceWorker implements Runnable {
         server_state.main_loop.wakeup();
     }
 
-    public int getLearnedMaxInstance(){
-        return this.learned_max_instance;
-    }
-
     private int ownValue() {
-        return (this.request != null) ? this.request.getId() : NO_OP;
+        return (this.request != null) ? this.request.getId() : this.forced_value;
     }
 }
