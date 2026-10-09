@@ -1,6 +1,11 @@
 package didatrade.server;
 
 import java.util.Hashtable;
+import java.util.ArrayList;
+import java.util.List;
+
+import didatrade.DidaTradePaxos;
+
 
 
 public class PaxosLog {
@@ -29,24 +34,18 @@ public class PaxosLog {
 	return entry;
     }
 
-    
-    public synchronized PaxosInstance testAndSetEntry(int position, int ballot) {
-	PaxosInstance entry = this.log.get(position);
 
-	if (entry == null){
-	    entry = new PaxosInstance(position, ballot);
-	    this.log.put (position, entry);
-	}
-	return entry;
-    }
-
-    public synchronized int highestInstance() {
-        int max = -1;
-        for (Integer key : this.log.keySet()) {
-            if (key > max) {
-                max = key;
+    public synchronized List<DidaTradePaxos.AcceptedEntry> acceptedFrom(int from) {
+        List<DidaTradePaxos.AcceptedEntry> accepted = new ArrayList<DidaTradePaxos.AcceptedEntry>();
+        for (PaxosInstance entry : this.log.values()) {
+            if (entry.instance_nb >= from && entry.write_ballot > -1) {
+                accepted.add(DidaTradePaxos.AcceptedEntry.newBuilder()
+                    .setInstance(entry.instance_nb)
+                    .setValue(entry.accepted_value)
+                    .setValballot(entry.write_ballot)
+                    .build());
             }
         }
-        return max;
+        return accepted;
     }
 }

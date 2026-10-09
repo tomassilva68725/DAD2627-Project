@@ -10,14 +10,17 @@ message PhaseOneRequest {
 }
 
 message PhaseOneReply {
-  int32 instance        = 1;
+  repeated AcceptedEntry entries = 1;
   int32 serverid        = 2;
   int32 requestballot	  = 3;
   bool  accepted 	      = 4;
-  int32 value           = 5;
-  int32 valballot       = 6;
-  int32 maxballot       = 7;
-  int32 maxinstance     = 8;
+  int32 maxballot       = 5;
+}
+
+message AcceptedEntry {
+  int32 instance = 1;
+  int32 value = 2;
+  int32 valballot = 3;
 }
 
 message PhaseTwoRequest {
@@ -38,6 +41,7 @@ message LearnRequest {
   int32 instance   = 1;
   int32 ballot     = 2;
   int32 value      = 3;
+  int32 serverid   = 4;
 }
 
 message LearnReply {

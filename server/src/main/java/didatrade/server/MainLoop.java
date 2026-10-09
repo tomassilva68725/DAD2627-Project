@@ -10,8 +10,6 @@ import didatrade.DidaTradePaxosServiceGrpc;
 import didatrade.util.GenericResponseCollector;
 import didatrade.util.CollectorStreamObserver;
 import didatrade.util.PhaseOneResponseProcessor;
-//import didatrade.util.PhaseOneBogusProcessor;
-import didatrade.util.PhaseTwoResponseProcessor;
 
 import didatrade.configs.ConfigurationScheduler;
 
@@ -66,7 +64,7 @@ public class MainLoop implements Runnable  {
     		continue;
 }
 		int instance = allocateNextInstance();
-		InstanceWorker worker = new InstanceWorker(this.server_state, instance, request);
+		InstanceWorker worker = new InstanceWorker(this.server_state, ballot, instance, request);
 		new Thread(worker).start();
 	}
     }
@@ -94,42 +92,59 @@ public class MainLoop implements Runnable  {
 	notify();    
     }
 
-	private void takeOverAsLeader(int ballot){
+	// Multi-Paxos: uma unica fase 1 por ballot, cobrindo todas as instancias a partir de "from"
+	private void takeOverAsLeader(int ballot) {
 		int from = server_state.applier.getNextApply();
+		List<Integer> acceptors = server_state.scheduler.acceptors(ballot);
+		int n_acceptors = acceptors.size();
 
-		InstanceWorker first_cleanup = new InstanceWorker(this.server_state, from, null);
-		first_cleanup.run();
+		DidaTradePaxos.PhaseOneRequest request = DidaTradePaxos.PhaseOneRequest.newBuilder()
+			.setInstance(from)
+			.setRequestballot(ballot)
+			.build();
 
-		if (server_state.getCurrentBallot() != ballot){
+		int low_ballot = Math.max(server_state.getCompletedBallot(), 0);
+		PhaseOneResponseProcessor processor = new PhaseOneResponseProcessor(server_state.scheduler, low_ballot, ballot);
+		ArrayList<DidaTradePaxos.PhaseOneReply> responses = new ArrayList<DidaTradePaxos.PhaseOneReply>();
+		GenericResponseCollector<DidaTradePaxos.PhaseOneReply> collector =
+			new GenericResponseCollector<DidaTradePaxos.PhaseOneReply>(responses, n_acceptors, processor);
+
+		for (int i = 0; i < n_acceptors; i++) {
+			CollectorStreamObserver<DidaTradePaxos.PhaseOneReply> observer =
+				new CollectorStreamObserver<DidaTradePaxos.PhaseOneReply>(collector);
+			server_state.async_stubs[acceptors.get(i)].phaseone(request, observer);
+		}
+		collector.waitUntilDone();
+
+		if (!processor.getAccepted()) {
+			server_state.setCurrentBallot(processor.getMaxBallot());
+			try { Thread.sleep(100); } catch (InterruptedException e) {}
 			return;
 		}
 
-		int remote = first_cleanup.getLearnedMaxInstance();
-		int local = server_state.paxos_log.highestInstance();
-		int horizon = Math.max(remote, local) + 1;
+		HashMap<Integer, DidaTradePaxos.AcceptedEntry> accepted = processor.getResponses();
+		int horizon = from;
+		for (int inst : accepted.keySet())
+			horizon = Math.max(horizon, inst + 1);
+
+		System.out.println("[" + System.currentTimeMillis() + "] Takeover ballot " + ballot + ": phase 1 done, re-proposing [" + from + ", " + horizon + ")");
+
+		this.next_log_entry.set(horizon - 1);
+
+		// tem de ser antes dos workers, senão o guard isPreparedFor manda-os embora
+		server_state.markPrepared(ballot);
 
 		List<Thread> workers = new ArrayList<Thread>();
-		for (int i = from + 1; i < horizon; i++) {
-			Thread t = new Thread(new InstanceWorker(this.server_state, i, null));
+		for (int i = from; i < horizon; i++) {
+			int value = accepted.containsKey(i) ? accepted.get(i).getValue() : InstanceWorker.NO_OP;
+			Thread t = new Thread(new InstanceWorker(this.server_state, ballot, i, null, value));
 			workers.add(t);
 			t.start();
 		}
 
 		for (Thread t : workers) {
-			try {
-				t.join();
-			} catch (InterruptedException e) {
-			}
+			try { t.join(); } catch (InterruptedException e) {}
 		}
-
-		if(server_state.getCurrentBallot() != ballot){
-			return;
-		}
-
-		if (horizon > this.next_log_entry.get()) {
-			this.next_log_entry.set(horizon - 1);
-		}
-
-		server_state.markPrepared(ballot, horizon);
 	}
+ 
 }
