@@ -1,5 +1,6 @@
 package didatrade.server;
 
+import java.util.HashMap;
 import java.util.HashSet;
 
 public class PaxosInstance {
@@ -8,7 +9,7 @@ public class PaxosInstance {
     int accepted_value;
     int write_ballot;
     int accept_ballot;
-    HashSet<Integer> acceptors;
+     HashMap<Integer, HashSet<Integer>> votes;
     boolean decided;
     boolean value_is_locked;
 
@@ -18,7 +19,7 @@ public class PaxosInstance {
         this.accepted_value  = 0;
         this.write_ballot    = -1;
 	this.accept_ballot   = -1;
-        this.acceptors       = new HashSet<Integer>();
+        this.votes = new HashMap<Integer, HashSet<Integer>>();
 	this.decided         = false;
         this.value_is_locked = false;
     }
@@ -30,7 +31,7 @@ public class PaxosInstance {
         this.accepted_value  = 0;
         this.write_ballot    = -1;
 	this.accept_ballot   = -1;
-        this.acceptors       = new HashSet<Integer>();
+        this.votes = new HashMap<Integer, HashSet<Integer>>();
 	this.decided         = false;
         this.value_is_locked = false;
     }

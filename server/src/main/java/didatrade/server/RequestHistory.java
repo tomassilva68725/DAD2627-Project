@@ -4,6 +4,9 @@ package didatrade.server;
 import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.ArrayDeque;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Collections;
 
 public class RequestHistory {
     private Hashtable<Integer, RequestRecord> pending;
@@ -63,6 +66,12 @@ public class RequestHistory {
 	if (record == null)
 	    record = this.processed.get(id);
 	return record;
+    }
+
+    public synchronized List<Integer> pendingIdsSorted() {
+        List<Integer> ids = new ArrayList<Integer>(this.pending.keySet());
+        Collections.sort(ids);
+        return ids;
     }
    
     public synchronized void addToPending(int requestid, RequestRecord record) {

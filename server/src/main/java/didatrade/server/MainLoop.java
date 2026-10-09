@@ -54,6 +54,12 @@ public class MainLoop implements Runnable  {
 			continue;
 		}
 
+		// Fast Paxos: num ballot F o líder não propõe pedidos; são os acceptors que os aceitam diretamente dos clientes
+		if (server_state.isFast(ballot)) {
+			waitForWork();
+			continue;
+		}
+
 		RequestRecord request = this.server_state.req_history.takeFirstPending();
 		if (request == null) {
     		waitForWork();
@@ -123,6 +129,8 @@ public class MainLoop implements Runnable  {
 		}
 
 		HashMap<Integer, DidaTradePaxos.AcceptedEntry> accepted = processor.getResponses();
+		HashMap<Integer, List<DidaTradePaxos.AcceptedEntry>> all_entries = processor.getAllEntries();
+		int n_promises = processor.getPromiseCount();
 		int horizon = from;
 		for (int inst : accepted.keySet())
 			horizon = Math.max(horizon, inst + 1);
@@ -136,14 +144,58 @@ public class MainLoop implements Runnable  {
 
 		List<Thread> workers = new ArrayList<Thread>();
 		for (int i = from; i < horizon; i++) {
-			int value = accepted.containsKey(i) ? accepted.get(i).getValue() : InstanceWorker.NO_OP;
+			int value = chooseValue(all_entries.get(i), n_promises);
 			Thread t = new Thread(new InstanceWorker(this.server_state, ballot, i, null, value));
 			workers.add(t);
 			t.start();
 		}
 
+		// Fast Paxos: a partir do horizon os acceptors aceitam valores diretamente dos clientes
+		if (server_state.isFast(ballot))
+			sendAny(ballot, horizon);
+
 		for (Thread t : workers) {
 			try { t.join(); } catch (InterruptedException e) {}
+		}
+	}
+
+	private int chooseValue(List<DidaTradePaxos.AcceptedEntry> entries, int n_promises) {
+		if (entries == null || entries.isEmpty())
+			return InstanceWorker.NO_OP;
+		int k = -1;
+		for (DidaTradePaxos.AcceptedEntry e : entries)
+			k = Math.max(k, e.getValballot());
+		HashMap<Integer, Integer> count = new HashMap<Integer, Integer>();
+		for (DidaTradePaxos.AcceptedEntry e : entries)
+			if (e.getValballot() == k)
+				count.merge(e.getValue(), 1, Integer::sum);
+		if (!server_state.isFast(k))
+			return count.keySet().iterator().next();
+		int f = server_state.scheduler.acceptors(k).size() - server_state.scheduler.fastquorum(k);
+		int best = InstanceWorker.NO_OP, best_count = -1;
+		for (Map.Entry<Integer, Integer> c : count.entrySet()) {
+			if (n_promises - c.getValue() <= f)
+				return c.getKey();                       // pode ter sido decidido no ballot rápido k: obrigatório
+			if (c.getValue() > best_count) {
+				best = c.getKey();
+				best_count = c.getValue();
+			}
+		}
+		return best;
+	}
+
+	private void sendAny(int ballot, int from) {
+		System.out.println("[" + System.currentTimeMillis() + "] Leader: ballot " + ballot + " is FAST -> sending ANY from instance " + from);
+		DidaTradePaxos.PhaseTwoRequest any = DidaTradePaxos.PhaseTwoRequest.newBuilder()
+			.setInstance(from)
+			.setRequestballot(ballot)
+			.setValue(InstanceWorker.NO_OP)
+			.setAny(true)
+			.build();
+		for (int a : server_state.scheduler.acceptors(ballot)) {
+			GenericResponseCollector<DidaTradePaxos.PhaseTwoReply> collector =
+				new GenericResponseCollector<DidaTradePaxos.PhaseTwoReply>(new ArrayList<DidaTradePaxos.PhaseTwoReply>(), 1);
+			server_state.async_stubs[a].phasetwo(any, new CollectorStreamObserver<DidaTradePaxos.PhaseTwoReply>(collector));
 		}
 	}
  

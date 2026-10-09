@@ -19,10 +19,11 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
     DidaTradeServerState server_state;
 
 
-	private final Object acceptor_lock = new Object();
+	private final Object acceptor_lock;
 
     public DidaTradePaxosServiceImpl(DidaTradeServerState state) {
 	this.server_state = state;
+	this.acceptor_lock = state.acceptor_lock;
     }
  
     @Override
@@ -71,6 +72,16 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 	int instance          = request.getInstance();
 	int ballot            = request.getRequestballot();
 	int value             = request.getValue();
+
+	if (request.getAny()) {
+		int max = this.server_state.fast_acceptor.onAny(ballot, instance);
+		responseObserver.onNext(DidaTradePaxos.PhaseTwoReply.newBuilder()
+			.setInstance(instance).setServerid(this.server_state.my_id).setRequestballot(ballot)
+			.setAccepted(max <= ballot).setMaxballot(max).build());
+		responseObserver.onCompleted();
+		return;
+	}
+
 	PaxosInstance entry   = this.server_state.paxos_log.testAndSetEntry(instance);
 	boolean accepted      = false;
 	int  maxballot        = ballot;
@@ -154,26 +165,45 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 	    this.server_state.setCurrentBallot(ballot);
 	    
 	    if (ballot > entry.accept_ballot) {
-			// ballot mais recente para esta instância: recomeça a contagem
-			System.out.println("Paxos learner for instance " + instance + " : resetting ");
-			entry.accept_ballot = ballot;
-			entry.acceptors.clear();
-			synchronized (entry) {
-				if (!entry.decided)
-				entry.command_id = value;
-		}
+		// ballot mais recente para esta instância: recomeça a contagem
+		entry.accept_ballot = ballot;
+		entry.votes.clear();
 	    }
 
 	    if (ballot == entry.accept_ballot) {
-			entry.acceptors.add(acceptor);   // é um Set: o mesmo acceptor só conta uma vez
-		System.out.println("Paxos learner for instance " + instance + " : accepts from " + entry.acceptors);
+		// votos por VALOR: num ballot rápido acceptors diferentes podem aceitar valores diferentes
+		HashSet<Integer> voters = entry.votes.get(value);
+		if (voters == null) {
+		    voters = new HashSet<Integer>();
+		    entry.votes.put(value, voters);
+		}
+		voters.add(acceptor);   // é um Set: o mesmo acceptor só conta uma vez
+		System.out.println("Paxos learner for instance " + instance + " ballot " + ballot + " : votes " + entry.votes);
 
-		if (entry.acceptors.size() >= this.server_state.scheduler.quorum(ballot)) {
+		int needed = this.server_state.decisionQuorum(ballot);
+		if (voters.size() >= needed) {
 		    synchronized (entry) {
-			entry.decided = true;
+			if (!entry.decided) {
+			    entry.command_id = value;
+			    entry.decided    = true;
+			}
 			entry.notifyAll();
 		    }
 		    this.server_state.updateCompletedBallot(ballot);
+		}
+		else if (this.server_state.isFast(ballot) && !entry.decided) {
+		    // colisão: nenhum valor ainda consegue chegar ao quórum rápido neste ballot
+		    int n_acceptors = this.server_state.scheduler.acceptors(ballot).size();
+		    int voted = 0, best = 0;
+		    for (HashSet<Integer> v : entry.votes.values()) {
+			voted += v.size();
+			best = Math.max(best, v.size());
+		    }
+		    if (best + (n_acceptors - voted) < needed && this.server_state.getCurrentBallot() == ballot) {
+			System.out.println("Paxos learner: COLLISION on instance " + instance + " in fast ballot " + ballot + " -> moving to ballot " + (ballot + 1));
+			this.server_state.setCurrentBallot(ballot + 1);
+			this.server_state.main_loop.wakeup();
+		    }
 		}
 	    }
 	}

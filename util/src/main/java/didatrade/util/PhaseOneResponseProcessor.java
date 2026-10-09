@@ -1,5 +1,6 @@
 package didatrade.util;
 
+import java.util.List;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.HashMap;
@@ -11,6 +12,7 @@ public class PhaseOneResponseProcessor extends GenericResponseProcessor<DidaTrad
     private ConfigurationScheduler   scheduler;
     private HashSet<Integer>         promises;
 	private HashMap<Integer, DidaTradePaxos.AcceptedEntry> responses;
+	private HashMap<Integer, List<DidaTradePaxos.AcceptedEntry>> all_entries;
     private boolean                  rejected;
     private boolean                  has_quorum;
     private int                      low_ballot;   
@@ -20,6 +22,7 @@ public class PhaseOneResponseProcessor extends GenericResponseProcessor<DidaTrad
     public PhaseOneResponseProcessor (ConfigurationScheduler s, int l, int h) {
 	this.promises    = new HashSet<Integer>();
 	this.responses   = new HashMap<Integer, DidaTradePaxos.AcceptedEntry>();
+	this.all_entries = new HashMap<Integer, List<DidaTradePaxos.AcceptedEntry>>();
 	this.rejected    = false;
 	this.has_quorum  = false;
 	this.maxballot   = -1;
@@ -40,6 +43,13 @@ public class PhaseOneResponseProcessor extends GenericResponseProcessor<DidaTrad
 		return this.responses;
 	}
 
+	public synchronized HashMap<Integer, List<DidaTradePaxos.AcceptedEntry>> getAllEntries() {
+		return this.all_entries;
+	}
+
+	public synchronized int getPromiseCount() {
+		return this.promises.size();
+	}
 
     public synchronized boolean onNext(ArrayList<DidaTradePaxos.PhaseOneReply> all_responses, DidaTradePaxos.PhaseOneReply last_response) {
 	
@@ -59,6 +69,12 @@ public class PhaseOneResponseProcessor extends GenericResponseProcessor<DidaTrad
 	    if (current == null || entry.getValballot() > current.getValballot()) {
 	        this.responses.put(entry.getInstance(), entry);
 	    }
+		List<DidaTradePaxos.AcceptedEntry> list = this.all_entries.get(entry.getInstance());
+		if (list == null) {
+			list = new ArrayList<DidaTradePaxos.AcceptedEntry>();
+			this.all_entries.put(entry.getInstance(), list);
+		}
+		list.add(entry);
 	}
 
 

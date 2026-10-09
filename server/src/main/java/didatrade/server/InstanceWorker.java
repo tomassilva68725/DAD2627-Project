@@ -54,7 +54,7 @@ public class InstanceWorker implements Runnable {
             }
 
             List<Integer> acceptors = server_state.scheduler.acceptors(ballot);
-            int quorum = server_state.scheduler.quorum(ballot);
+            int quorum = server_state.decisionQuorum(ballot);
             int n_acceptors = acceptors.size();
 
             int value = ownValue();
