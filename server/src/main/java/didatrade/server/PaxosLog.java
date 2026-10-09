@@ -41,7 +41,7 @@ public class PaxosLog {
             if (entry.instance_nb >= from && entry.write_ballot > -1) {
                 accepted.add(DidaTradePaxos.AcceptedEntry.newBuilder()
                     .setInstance(entry.instance_nb)
-                    .setValue(entry.command_id)
+                    .setValue(entry.accepted_value)
                     .setValballot(entry.write_ballot)
                     .build());
             }

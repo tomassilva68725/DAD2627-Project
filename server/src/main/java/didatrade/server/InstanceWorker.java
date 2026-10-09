@@ -10,17 +10,19 @@ import didatrade.util.PhaseTwoResponseProcessor;
 
 public class InstanceWorker implements Runnable {
     private DidaTradeServerState server_state;
+    private int ballot;
     private int instance;
     private RequestRecord request;
     private int forced_value;
     public static final int NO_OP = -1;
 
-    public InstanceWorker(DidaTradeServerState state, int instance, RequestRecord request) {
-        this(state, instance, request, NO_OP);
+    public InstanceWorker(DidaTradeServerState state, int ballot, int instance, RequestRecord request) {
+        this(state, ballot, instance, request, NO_OP);
     }
 
-    public InstanceWorker(DidaTradeServerState state, int instance, RequestRecord request, int forced_value) {
+    public InstanceWorker(DidaTradeServerState state, int ballot, int instance, RequestRecord request, int forced_value) {
         this.server_state = state;
+        this.ballot       = ballot;
         this.instance     = instance;
         this.request      = request;
         this.forced_value = forced_value;
@@ -32,7 +34,12 @@ public class InstanceWorker implements Runnable {
 
         while (!decided) {
             this.server_state.waitIfFrozen();
-            int ballot = this.server_state.getCurrentBallot();
+            int ballot = this.ballot;
+
+            if (this.server_state.getCurrentBallot() != ballot) {
+                giveBackRequest();
+                return;
+            } 
 
             if(server_state.scheduler.leader(ballot) != server_state.my_id) {
                 // Not the leader

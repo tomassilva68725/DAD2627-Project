@@ -79,7 +79,7 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 		if (ballot >= this.server_state.getCurrentBallot()) {
 			accepted           = true;
 			synchronized (entry) {
-				entry.command_id   = value;
+				entry.accepted_value = value;
 				entry.write_ballot = ballot;
 			}
 			this.server_state.setCurrentBallot(ballot);
@@ -115,6 +115,7 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 		    learn_request_builder.setInstance(instance);
 		    learn_request_builder.setValue(value);
 		    learn_request_builder.setBallot(ballot);
+			learn_request_builder.setServerid(this.server_state.my_id);
 		    
 		    DidaTradePaxos.LearnRequest learn_request = learn_request_builder.build();
 		    
@@ -142,6 +143,7 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 	int instance         = request.getInstance();
 	int ballot           = request.getBallot();
 	int value            = request.getValue();
+	int acceptor 		 = request.getServerid();
 
 	
 	synchronized (this) {
@@ -151,23 +153,28 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 
 	    this.server_state.setCurrentBallot(ballot);
 	    
-	    if (ballot == entry.accept_ballot) {
-		entry.n_accepts++;
-		System.out.println("Paxos learner for instance " + instance + " : number of accepts " +  entry.n_accepts);
-		if (entry.n_accepts >= this.server_state.scheduler.quorum(ballot)) {
-    		System.out.println("Paxos learner: waking up the main loop");
-    		synchronized (entry) {
-        		entry.decided = true;
-        		entry.notifyAll();
-    	}
-    	this.server_state.updateCompletedBallot(ballot);
-		}	
+	    if (ballot > entry.accept_ballot) {
+			// ballot mais recente para esta instância: recomeça a contagem
+			System.out.println("Paxos learner for instance " + instance + " : resetting ");
+			entry.accept_ballot = ballot;
+			entry.acceptors.clear();
+			synchronized (entry) {
+				if (!entry.decided)
+				entry.command_id = value;
+		}
 	    }
-	    else if (ballot > entry.accept_ballot) {
-		System.out.println("Paxos learner for instance " + instance + " : resetting ");
-		entry.command_id     = value;
-		entry.accept_ballot  = ballot;
-		entry.n_accepts      = 1;
+
+	    if (ballot == entry.accept_ballot) {
+			entry.acceptors.add(acceptor);   // é um Set: o mesmo acceptor só conta uma vez
+		System.out.println("Paxos learner for instance " + instance + " : accepts from " + entry.acceptors);
+
+		if (entry.acceptors.size() >= this.server_state.scheduler.quorum(ballot)) {
+		    synchronized (entry) {
+			entry.decided = true;
+			entry.notifyAll();
+		    }
+		    this.server_state.updateCompletedBallot(ballot);
+		}
 	    }
 	}
 	

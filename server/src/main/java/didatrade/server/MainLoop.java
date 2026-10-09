@@ -64,7 +64,7 @@ public class MainLoop implements Runnable  {
     		continue;
 }
 		int instance = allocateNextInstance();
-		InstanceWorker worker = new InstanceWorker(this.server_state, instance, request);
+		InstanceWorker worker = new InstanceWorker(this.server_state, ballot, instance, request);
 		new Thread(worker).start();
 	}
     }
@@ -129,8 +129,7 @@ public class MainLoop implements Runnable  {
 
 		System.out.println("[" + System.currentTimeMillis() + "] Takeover ballot " + ballot + ": phase 1 done, re-proposing [" + from + ", " + horizon + ")");
 
-		if (horizon - 1 > this.next_log_entry.get())
-			this.next_log_entry.set(horizon - 1);
+		this.next_log_entry.set(horizon - 1);
 
 		// tem de ser antes dos workers, senão o guard isPreparedFor manda-os embora
 		server_state.markPrepared(ballot);
@@ -138,7 +137,7 @@ public class MainLoop implements Runnable  {
 		List<Thread> workers = new ArrayList<Thread>();
 		for (int i = from; i < horizon; i++) {
 			int value = accepted.containsKey(i) ? accepted.get(i).getValue() : InstanceWorker.NO_OP;
-			Thread t = new Thread(new InstanceWorker(this.server_state, i, null, value));
+			Thread t = new Thread(new InstanceWorker(this.server_state, ballot, i, null, value));
 			workers.add(t);
 			t.start();
 		}
