@@ -5,10 +5,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class Applier implements Runnable {
     private DidaTradeServerState server_state;
     private AtomicInteger next_apply;
+    private int executed;
 
     public Applier(DidaTradeServerState state) {
         this.server_state = state;
         this.next_apply   = new AtomicInteger(0);
+        this.executed     = 0;
     }
 
     public int getNextApply() {
@@ -27,20 +29,21 @@ public class Applier implements Runnable {
                     } catch (InterruptedException e) {}
                 }
             }
-        applyEntry(entry.command_id);
+        applyEntry(entry.command_id, this.next_apply.get() + 1);
         this.next_apply.incrementAndGet();
         }
     }
 
-    private void applyEntry(int command_id) {
+    private void applyEntry(int command_id, int index) {
         if(command_id == InstanceWorker.NO_OP) {
+            markExecuted(index);
             return;
         }
         
         while(server_state.req_history.getIfProcessed(command_id) == null) {
             RequestRecord request_record = server_state.req_history.getIfPending(command_id);
             if (request_record != null) {
-                executeCommand(request_record);
+                executeCommand(request_record, index);
                 server_state.req_history.moveToProcessed(command_id);
                 return;
             }
@@ -49,40 +52,67 @@ public class Applier implements Runnable {
         } catch (InterruptedException e) {}
         }
     }
+
+    // Step 4: avança o contador de instâncias executadas 
+    private void markExecuted(int index) {
+        synchronized (server_state.trade_manager) {
+            if (index > this.executed)
+                this.executed = index;
+            server_state.trade_manager.notifyAll();
+        }
+    }
+
+    // Step 4: balance SEM Paxos. Espera até esta réplica ter executado pelo menos 'lastseen' instâncias *rever
+    public int[] causalBalance(int user_id, int lastseen) {
+        synchronized (server_state.trade_manager) {
+            while (this.executed < lastseen) {
+                try {
+                    server_state.trade_manager.wait();
+                } catch (InterruptedException e) {}
+            }
+            return new int[] { server_state.trade_manager.balance(user_id), this.executed };
+        }
+    }
      
-    private void executeCommand(RequestRecord request_record) {
+    private void executeCommand(RequestRecord request_record, int index) {
         DidaTradeCommand command = request_record.getRequest();
         boolean result = false;
         int balance = 0;
 
-        switch (command.getAction()) {
-            case DidaTradeAction.POPULATE:
-                result = server_state.trade_manager.populate(command.getQuantity());
-                break;
-            case DidaTradeAction.ADDUSER:
-                result = server_state.trade_manager.add_user(command.getUserId(), command.getQuantity(), command.getStock());
-                break;
-            case DidaTradeAction.SELL:
-                result = server_state.trade_manager.sell(command.getUserId(), command.getQuantity());
-                break;
-            case DidaTradeAction.BUY:
-                result = server_state.trade_manager.acquire(command.getUserId(), command.getQuantity());
-                break;
-            case DidaTradeAction.BALANCE:
-                balance = server_state.trade_manager.balance(command.getUserId());
-                command.setQuantity(balance);
-                result = (balance != -1);
-                break;
-            case DidaTradeAction.DUMP:
-                server_state.trade_manager.dump();
-                result = true;
-                break;
-            default:
-                result = false;
-                System.err.println("*** Unknown command ****");
-                break;
+        synchronized (server_state.trade_manager) {
+            switch (command.getAction()) {
+                case DidaTradeAction.POPULATE:
+                    result = server_state.trade_manager.populate(command.getQuantity());
+                    break;
+                case DidaTradeAction.ADDUSER:
+                    result = server_state.trade_manager.add_user(command.getUserId(), command.getQuantity(), command.getStock());
+                    break;
+                case DidaTradeAction.SELL:
+                    result = server_state.trade_manager.sell(command.getUserId(), command.getQuantity());
+                    break;
+                case DidaTradeAction.BUY:
+                    result = server_state.trade_manager.acquire(command.getUserId(), command.getQuantity());
+                    break;
+                case DidaTradeAction.BALANCE:
+                    balance = server_state.trade_manager.balance(command.getUserId());
+                    command.setQuantity(balance);
+                    result = (balance != -1);
+                    break;
+                case DidaTradeAction.DUMP:
+                    server_state.trade_manager.dump();
+                    result = true;
+                    break;
+                default:
+                    result = false;
+                    System.err.println("*** Unknown command ****");
+                    break;
+            }
+        
+        if (index > this.executed)
+            this.executed = index;
+        server_state.trade_manager.notifyAll();
         }
-
-        request_record.setResponse(result);
+        
+        request_record.setResponse(result, index);
     }
 }

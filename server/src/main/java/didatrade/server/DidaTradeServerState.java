@@ -40,6 +40,7 @@ public class DidaTradeServerState {
 	private boolean             slow_on;
  
 	final Object                acceptor_lock = new Object();
+	boolean                     causal_balance = true;
 	FastAcceptor				fast_acceptor;
     MainLoop                    main_loop;
     Thread                      main_loop_worker;

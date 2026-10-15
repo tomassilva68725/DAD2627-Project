@@ -6,6 +6,7 @@ public class RequestRecord {
     private DidaTradeCommand request;
     private boolean response_available;
     private boolean response_value;
+    private int index;
     
     public RequestRecord(int id) {
 	this.requestid = id;
@@ -53,5 +54,14 @@ public class RequestRecord {
 	    }
 	}
 	return this.response_value;
+    }
+
+    public synchronized void setResponse(boolean resp, int index) {
+        this.index = index;
+        setResponse(resp);
+    }
+
+    public synchronized int getIndex() {
+        return this.index;
     }
 }
