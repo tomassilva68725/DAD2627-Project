@@ -100,8 +100,8 @@ public class MainLoop implements Runnable  {
 
 	// Multi-Paxos: uma unica fase 1 por ballot, cobrindo todas as instancias a partir de "from"
 	private void takeOverAsLeader(int ballot) {
-		int from = server_state.applier.getNextApply();
-		List<Integer> acceptors = server_state.scheduler.acceptorsinrange(0, ballot);
+		int from = 0;//para fazer o vertical Paxos I
+		List<Integer> acceptors = server_state.scheduler.acceptorsinrange(0, ballot);//para vertical Paxos I
 		int n_acceptors = acceptors.size();
 
 		DidaTradePaxos.PhaseOneRequest request = DidaTradePaxos.PhaseOneRequest.newBuilder()
@@ -134,7 +134,7 @@ public class MainLoop implements Runnable  {
 		for (int inst : accepted.keySet())
 			horizon = Math.max(horizon, inst + 1);
 
-		System.out.println("[" + System.currentTimeMillis() + "] Takeover ballot " + ballot + ": phase 1 done, re-proposing [" + from + ", " + horizon + ")");
+		System.out.println("[" + System.currentTimeMillis() + "] Takeover ballot " + ballot + ": phase 1 done, re-proposing [" + from + ", " + horizon + "]");
 
 		this.next_log_entry.set(horizon - 1);
 
