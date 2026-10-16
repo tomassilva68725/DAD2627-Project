@@ -9,7 +9,7 @@ public class PaxosInstance {
     int accepted_value;
     int write_ballot;
     int accept_ballot;
-     HashMap<Integer, HashSet<Integer>> votes;
+    HashMap<Integer, HashMap<Integer, HashSet<Integer>>> votes;   // ballot -> valor -> acceptors
     boolean decided;
     boolean value_is_locked;
 
@@ -19,7 +19,7 @@ public class PaxosInstance {
         this.accepted_value  = 0;
         this.write_ballot    = -1;
 	this.accept_ballot   = -1;
-        this.votes = new HashMap<Integer, HashSet<Integer>>();
+        this.votes = new HashMap<Integer, HashMap<Integer, HashSet<Integer>>>();
 	this.decided         = false;
         this.value_is_locked = false;
     }
@@ -31,7 +31,7 @@ public class PaxosInstance {
         this.accepted_value  = 0;
         this.write_ballot    = -1;
 	this.accept_ballot   = -1;
-        this.votes = new HashMap<Integer, HashSet<Integer>>();
+        this.votes = new HashMap<Integer, HashMap<Integer, HashSet<Integer>>>();
 	this.decided         = false;
         this.value_is_locked = false;
     }

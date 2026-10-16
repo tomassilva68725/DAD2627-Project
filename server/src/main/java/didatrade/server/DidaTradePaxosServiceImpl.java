@@ -164,21 +164,34 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 
 	    this.server_state.setCurrentBallot(ballot);
 	    
-	    if (ballot > entry.accept_ballot) {
-		// ballot mais recente para esta instância: recomeça a contagem
+	    if (ballot > entry.accept_ballot)
 		entry.accept_ballot = ballot;
-		entry.votes.clear();
+
+	    boolean already_decided;
+	    synchronized (entry) {
+		already_decided = entry.decided;
 	    }
 
-	    if (ballot == entry.accept_ballot) {
-		// votos por VALOR: num ballot rápido acceptors diferentes podem aceitar valores diferentes
-		HashSet<Integer> voters = entry.votes.get(value);
+	    if (already_decided) {
+		// instância já aprendida: os votos deixam de ser precisos
+		entry.votes.clear();
+	    }
+	    else {
+		// votos separados por BALLOT e por VALOR: um valor está escolhido quando um quórum
+		// de acceptors o aceitou no mesmo ballot, seja ele qual for (votos de ballots
+		// antigos que chegam atrasados continuam a contar)
+		HashMap<Integer, HashSet<Integer>> ballot_votes = entry.votes.get(ballot);
+		if (ballot_votes == null) {
+		    ballot_votes = new HashMap<Integer, HashSet<Integer>>();
+		    entry.votes.put(ballot, ballot_votes);
+		}
+		HashSet<Integer> voters = ballot_votes.get(value);
 		if (voters == null) {
 		    voters = new HashSet<Integer>();
-		    entry.votes.put(value, voters);
+		    ballot_votes.put(value, voters);
 		}
 		voters.add(acceptor);   // é um Set: o mesmo acceptor só conta uma vez
-		System.out.println("Paxos learner for instance " + instance + " ballot " + ballot + " : votes " + entry.votes);
+		System.out.println("Paxos learner for instance " + instance + " ballot " + ballot + " : votes " + ballot_votes);
 
 		int needed = this.server_state.decisionQuorum(ballot);
 		if (voters.size() >= needed) {
@@ -189,12 +202,13 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 			}
 			entry.notifyAll();
 		    }
+		    entry.votes.clear();
 		}
-		else if (this.server_state.isFast(ballot) && !entry.decided) {
-		    // colisão: nenhum valor ainda consegue chegar ao quórum rápido neste ballot
+		else if (this.server_state.isFast(ballot)) {
+		    // colisão: nenhum valor ainda consegue chegar ao quórum rápido NESTE ballot
 		    int n_acceptors = this.server_state.scheduler.acceptors(ballot).size();
 		    int voted = 0, best = 0;
-		    for (HashSet<Integer> v : entry.votes.values()) {
+		    for (HashSet<Integer> v : ballot_votes.values()) {
 			voted += v.size();
 			best = Math.max(best, v.size());
 		    }
