@@ -100,16 +100,21 @@ public class MainLoop implements Runnable  {
 
 	// Multi-Paxos: uma unica fase 1 por ballot, cobrindo todas as instancias a partir de "from"
 	private void takeOverAsLeader(int ballot) {
-		int from = 0;//para fazer o vertical Paxos I
-		List<Integer> acceptors = server_state.scheduler.acceptorsinrange(0, ballot);//para vertical Paxos I
+
+		// Vertical Paxos: basta ler as configurações desde o último ballot COMPLETO
+		int low_ballot = Math.max(server_state.getCompletedBallot(), 0);
+		List<Integer> acceptors = server_state.scheduler.acceptorsinrange(low_ballot, ballot);
 		int n_acceptors = acceptors.size();
+
+		// state transfer: se a configuração muda, re-escreve o log TODO na configuração nova; senão, só o que falta
+		boolean new_config = !acceptors.equals(server_state.scheduler.acceptors(ballot));
+		int from = new_config ? 0 : server_state.applier.getNextApply();
 
 		DidaTradePaxos.PhaseOneRequest request = DidaTradePaxos.PhaseOneRequest.newBuilder()
 			.setInstance(from)
 			.setRequestballot(ballot)
 			.build();
 
-		int low_ballot = 0;
 		PhaseOneResponseProcessor processor = new PhaseOneResponseProcessor(server_state.scheduler, low_ballot, ballot);
 		ArrayList<DidaTradePaxos.PhaseOneReply> responses = new ArrayList<DidaTradePaxos.PhaseOneReply>();
 		GenericResponseCollector<DidaTradePaxos.PhaseOneReply> collector =
@@ -143,7 +148,7 @@ public class MainLoop implements Runnable  {
 
 		List<Thread> workers = new ArrayList<Thread>();
 		for (int i = from; i < horizon; i++) {
-			int value = chooseValue(all_entries.get(i), processor);
+			int value = chooseValue(all_entries.get(i));
 			Thread t = new Thread(new InstanceWorker(this.server_state, ballot, i, null, value));
 			workers.add(t);
 			t.start();
@@ -156,10 +161,15 @@ public class MainLoop implements Runnable  {
 		for (Thread t : workers) {
 			try { t.join(); } catch (InterruptedException e) {}
 		}
+
+		// todos os valores antigos ficaram escritos na configuração deste ballot: o ballot está COMPLETO
+		if (server_state.getCurrentBallot() == ballot) {
+			System.out.println("[" + System.currentTimeMillis() + "] Ballot " + ballot + " is COMPLETE (state transfer done)");
+			server_state.setCompletedBallot(ballot);
+		}
 	}
 
-	private int chooseValue(List<DidaTradePaxos.AcceptedEntry> entries, PhaseOneResponseProcessor processesor) {
-		int n_promises;
+	private int chooseValue(List<DidaTradePaxos.AcceptedEntry> entries) {
 		if (entries == null || entries.isEmpty())
 			return InstanceWorker.NO_OP;
 		int k = -1;
@@ -172,13 +182,11 @@ public class MainLoop implements Runnable  {
 				count.merge(e.getValue(), 1, Integer::sum);
 		if (!server_state.isFast(k))
 			return count.keySet().iterator().next();
-		int f = server_state.scheduler.acceptors(k).size() - server_state.scheduler.fastquorum(k);
+		int recovery = server_state.scheduler.recoveryquorum(k);
 		int best = InstanceWorker.NO_OP, best_count = -1;
 
-		n_promises = processesor.getPromisesInConfig(k);
-
 		for (Map.Entry<Integer, Integer> c : count.entrySet()) {
-			if (n_promises - c.getValue() <= f)
+			if (c.getValue() >= recovery)
 				return c.getKey();                       // pode ter sido decidido no ballot rápido k: obrigatório
 			if (c.getValue() > best_count) {
 				best = c.getKey();

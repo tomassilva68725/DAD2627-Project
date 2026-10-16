@@ -53,10 +53,6 @@ public class PhaseOneResponseProcessor extends GenericResponseProcessor<DidaTrad
 		return this.all_entries;
 	}
 
-	public synchronized int getPromisesInConfig(int b) {
-    	return this.configuration_acceptors.get(b).size();
-	}
-
     public synchronized boolean onNext(ArrayList<DidaTradePaxos.PhaseOneReply> all_responses, DidaTradePaxos.PhaseOneReply last_response) {
 	
 	if (last_response.getMaxballot() > this.maxballot)

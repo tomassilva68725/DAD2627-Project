@@ -62,13 +62,16 @@ public class ConfigurationScheduler {
 	return s.quorum(ballot);
     }
 
+    public Integer fastquorum(int ballot) {
+	return s.fastquorum(ballot);
+    }
+
+    public Integer recoveryquorum(int ballot) {
+	return s.recoveryquorum(ballot);
+    }
+
     public boolean fastpaxos(int ballot) {
 	return s.fastpaxos(ballot);
     }
 
-    public Integer fastquorum(int ballot) {
-        int n = s.acceptors(ballot).size();
-        int f = (n + 3) / 4 - 1;
-        return new Integer(n - f);
-    }
 }

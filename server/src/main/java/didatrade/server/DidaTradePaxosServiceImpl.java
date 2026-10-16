@@ -189,7 +189,6 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 			}
 			entry.notifyAll();
 		    }
-		    this.server_state.updateCompletedBallot(ballot);
 		}
 		else if (this.server_state.isFast(ballot) && !entry.decided) {
 		    // colisão: nenhum valor ainda consegue chegar ao quórum rápido neste ballot

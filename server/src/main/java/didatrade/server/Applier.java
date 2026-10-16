@@ -51,6 +51,7 @@ public class Applier implements Runnable {
             Thread.sleep(100);
         } catch (InterruptedException e) {}
         }
+        markExecuted(index); 
     }
 
     // Step 4: avança o contador de instâncias executadas 

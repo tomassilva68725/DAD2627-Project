@@ -114,34 +114,6 @@ public class DidaTradeServerState {
 	    this.prepared_ballot = ballot;
     }
 
-    public int findMaxDecidedBallot () {
-	int ballot = -1;
-	int length = this.paxos_log.length();
-
-	for (int i=0; i< length; i++) {
-	    PaxosInstance entry = this.paxos_log.getEntry(i);
-	    if (entry == null)
-		return ballot;
-	    if (!entry.decided)
-		return ballot;
-	    else if (entry.accept_ballot > ballot)
-		ballot = entry.accept_ballot;
-
-	}
-	return ballot;
-    }
-    
-    public synchronized void updateCompletedBallot (int ballot) {
-	// WARNING: THIS ONLY WORKS FOR CONFIGURATIONS WHERE THERE IS NO NEED FOR STATE-TRANSFER!!!!!
-	// NEEDS TO BE UPDATE FOR THE PROJECT
-
-
-	ballot = this.findMaxDecidedBallot ();
-	if (ballot > this.completed_ballot)
-	    this.completed_ballot = ballot;
-	this.notifyAll();
-    }
-
     
     public synchronized void setCompletedBallot (int ballot) {
 	if (ballot > this.completed_ballot)
