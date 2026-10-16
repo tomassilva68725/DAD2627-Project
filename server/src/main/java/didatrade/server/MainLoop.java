@@ -182,11 +182,11 @@ public class MainLoop implements Runnable  {
 				count.merge(e.getValue(), 1, Integer::sum);
 		if (!server_state.isFast(k))
 			return count.keySet().iterator().next();
-		int recovery = server_state.scheduler.recoveryquorum(k);
+		int threshold = server_state.scheduler.recoveryquorum(k) + server_state.scheduler.fastquorum(k) - server_state.scheduler.acceptors(k).size();
 		int best = InstanceWorker.NO_OP, best_count = -1;
 
 		for (Map.Entry<Integer, Integer> c : count.entrySet()) {
-			if (c.getValue() >= recovery)
+			if (c.getValue() >= threshold)
 				return c.getKey();                       // pode ter sido decidido no ballot rápido k: obrigatório
 			if (c.getValue() > best_count) {
 				best = c.getKey();

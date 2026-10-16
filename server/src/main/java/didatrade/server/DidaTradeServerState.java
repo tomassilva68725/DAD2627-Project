@@ -138,10 +138,7 @@ public class DidaTradeServerState {
     }
 
 	public boolean isFast(int ballot) {
-		if (this.schedule == 'C'){
-			return this.scheduler.fastpaxos(ballot);
-		}
-	return getFastPaxosMode() && this.scheduler.fastpaxos(ballot);
+		return this.scheduler.fastpaxos(ballot);
 	}
 
 	public int decisionQuorum(int ballot) {

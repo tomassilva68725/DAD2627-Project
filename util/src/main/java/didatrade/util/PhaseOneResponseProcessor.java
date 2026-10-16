@@ -87,7 +87,7 @@ public class PhaseOneResponseProcessor extends GenericResponseProcessor<DidaTrad
 
 
 		for (Integer b : this.configuration_acceptors.keySet()){
-			if (this.configuration_acceptors.get(b).size() < this.scheduler.quorum(b)){
+			if (this.configuration_acceptors.get(b).size() < this.scheduler.recoveryquorum(b)){
 				return false;
 			}
 		}

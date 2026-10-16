@@ -50,7 +50,7 @@ public class ScheduleB extends Schedule {
     }
 
     public Integer recoveryquorum (int ballot) {
-	return new Integer(2);
+	return new Integer(3);
     }
     
     public boolean fastpaxos (int ballot) {
