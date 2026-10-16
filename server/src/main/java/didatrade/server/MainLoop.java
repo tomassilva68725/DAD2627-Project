@@ -3,18 +3,11 @@ package didatrade.server;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import didatrade.DidaTradeMain;
 import didatrade.DidaTradePaxos;
-import didatrade.DidaTradePaxosServiceGrpc;
 
 import didatrade.util.GenericResponseCollector;
 import didatrade.util.CollectorStreamObserver;
 import didatrade.util.PhaseOneResponseProcessor;
-
-import didatrade.configs.ConfigurationScheduler;
-
-import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
 
 
 public class MainLoop implements Runnable  {
@@ -22,11 +15,6 @@ public class MainLoop implements Runnable  {
 
     private boolean has_work;
     private AtomicInteger next_log_entry;
-    private List<Integer> all_participants;
-    private int n_participants;
-    private String[] targets;
-    private ManagedChannel[] channels;
-    private DidaTradePaxosServiceGrpc.DidaTradePaxosServiceStub[] async_stubs;
     
     
     public MainLoop(DidaTradeServerState state) {

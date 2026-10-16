@@ -43,6 +43,7 @@ message LearnRequest {
   int32 ballot     = 2;
   int32 value      = 3;
   int32 serverid   = 4;
+  bool  fast       = 5;   // true: voto do round rapido (any); false: valor proposto pelo lider
 }
 
 message LearnReply {

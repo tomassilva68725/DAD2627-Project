@@ -89,6 +89,7 @@ public class FastAcceptor {
             .setBallot(ballot)
             .setValue(value)
             .setServerid(server_state.my_id)
+            .setFast(true)
             .build();
         ArrayList<DidaTradePaxos.LearnReply> learn_responses = new ArrayList<DidaTradePaxos.LearnReply>();
         GenericResponseCollector<DidaTradePaxos.LearnReply> learn_collector =

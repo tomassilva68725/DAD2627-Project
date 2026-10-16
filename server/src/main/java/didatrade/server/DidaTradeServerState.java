@@ -30,7 +30,6 @@ public class DidaTradeServerState {
     private int                 completed_ballot;
 	private int                 prepared_ballot;
     private int                 debug_mode;
-    private boolean             fastpaxos_on;
 	private boolean             frozen_on;
 	private boolean             slow_on;
  
@@ -41,7 +40,6 @@ public class DidaTradeServerState {
     Thread                      main_loop_worker;
 	Applier                     applier;
     Thread                      applier_worker;
-	char 						schedule;
     
     public DidaTradeServerState(int port, int myself, char schedule) {
 	this.trade_manager    = new TradeManager();
@@ -49,7 +47,6 @@ public class DidaTradeServerState {
 	this.base_port        = port;
 	this.my_id            = myself;
 	this.debug_mode       = 0;
-	this.fastpaxos_on     = (schedule == 'B');
 	this.current_ballot   = 0;
 	this.completed_ballot = -1;
 	this.prepared_ballot  = -1;
@@ -62,7 +59,6 @@ public class DidaTradeServerState {
 	this.applier          = new Applier(this);
 	this.applier_worker   = new Thread(this.applier);
 	this.applier_worker.start();
-	this.schedule		  = schedule;
 
 	// populate manager
 	this.trade_manager.populate(DEFAULT_POPULATION);
@@ -133,21 +129,9 @@ public class DidaTradeServerState {
 	return this.completed_ballot;
     }
 
-    public synchronized boolean getFastPaxosMode () {
-	return this.fastpaxos_on;
-    }
-
 	public boolean isFast(int ballot) {
 		return this.scheduler.fastpaxos(ballot);
 	}
-
-	public int decisionQuorum(int ballot) {
-	return isFast(ballot) ? this.scheduler.fastquorum(ballot) : this.scheduler.quorum(ballot);
-	}
-
-    public synchronized void setFastPaxosMode (boolean mode) {
-	this.fastpaxos_on = mode;
-    }
 
     public synchronized int getDebugMode () {
 	return this.debug_mode;
@@ -156,10 +140,6 @@ public class DidaTradeServerState {
     public synchronized void setDebugMode (int mode) {
 	this.debug_mode = mode;
     }
-
-	public synchronized boolean isFrozen() {
-		return this.frozen_on;
-	}
 
 	public synchronized void setFrozen(boolean frozen_value) {
 		this.frozen_on = frozen_value;

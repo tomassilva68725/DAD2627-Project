@@ -15,15 +15,6 @@ public class PaxosLog {
 	this.log = new Hashtable<Integer, PaxosInstance>();
     }
 
-    public synchronized int length() {
-        return this.log.size();
-    }
-    
-    public synchronized PaxosInstance getEntry(int position) {
-        return this.log.get(position);
-    }
-   
-   
     public synchronized PaxosInstance testAndSetEntry(int position) {
 	PaxosInstance entry = this.log.get(position);
 

@@ -3,6 +3,7 @@ package didatrade.server;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class Applier implements Runnable {
+    public static final int STALL_TIMEOUT_MS = 3000;
     private DidaTradeServerState server_state;
     private AtomicInteger next_apply;
     private int executed;
@@ -22,12 +23,23 @@ public class Applier implements Runnable {
             this.server_state.waitIfFrozen();
             PaxosInstance entry = server_state.paxos_log.testAndSetEntry(this.next_apply.get());
         
+            int ballot = server_state.getCurrentBallot();
+            boolean decided;
             synchronized (entry) {
-                while (!entry.decided) {
-                    try {
-                        entry.wait();
-                    } catch (InterruptedException e) {}
+                if (!entry.decided) {
+                    try { entry.wait(STALL_TIMEOUT_MS); } catch (InterruptedException e) {}
                 }
+                decided = entry.decided;
+            }
+            if (!decided) {
+                // Fast Paxos: sem decisão nem colisão visível ao fim do timeout -> recuperação no ballot seguinte
+                if (server_state.getCurrentBallot() == ballot && server_state.isFast(ballot)
+                    && server_state.req_history.getFirstPending() != null) {
+                    System.out.println("Fast Paxos timeout on instance " + this.next_apply.get() + " -> moving to ballot " + (ballot + 1));
+                    server_state.setCurrentBallot(ballot + 1);
+                    server_state.main_loop.wakeup();
+                }
+                continue;
             }
         applyEntry(entry.command_id, this.next_apply.get() + 1);
         this.next_apply.incrementAndGet();

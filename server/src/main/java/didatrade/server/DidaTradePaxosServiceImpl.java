@@ -127,6 +127,7 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 		    learn_request_builder.setValue(value);
 		    learn_request_builder.setBallot(ballot);
 			learn_request_builder.setServerid(this.server_state.my_id);
+			learn_request_builder.setFast(false);
 		    
 		    DidaTradePaxos.LearnRequest learn_request = learn_request_builder.build();
 		    
@@ -164,9 +165,6 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 
 	    this.server_state.setCurrentBallot(ballot);
 	    
-	    if (ballot > entry.accept_ballot)
-		entry.accept_ballot = ballot;
-
 	    boolean already_decided;
 	    synchronized (entry) {
 		already_decided = entry.decided;
@@ -193,7 +191,8 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 		voters.add(acceptor);   // é um Set: o mesmo acceptor só conta uma vez
 		System.out.println("Paxos learner for instance " + instance + " ballot " + ballot + " : votes " + ballot_votes);
 
-		int needed = this.server_state.decisionQuorum(ballot);
+		int needed = request.getFast() ? this.server_state.scheduler.fastquorum(ballot)
+		                               : this.server_state.scheduler.quorum(ballot);
 		if (voters.size() >= needed) {
 		    synchronized (entry) {
 			if (!entry.decided) {
@@ -204,7 +203,7 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 		    }
 		    entry.votes.clear();
 		}
-		else if (this.server_state.isFast(ballot)) {
+		else if (request.getFast()) {
 		    // colisão: nenhum valor ainda consegue chegar ao quórum rápido NESTE ballot
 		    int n_acceptors = this.server_state.scheduler.acceptors(ballot).size();
 		    int voted = 0, best = 0;
