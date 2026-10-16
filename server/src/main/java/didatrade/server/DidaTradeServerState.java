@@ -1,15 +1,10 @@
 package didatrade.server;
 
-import java.util.*;
+import java.util.List;
 
-import didatrade.core.*;
-import didatrade.configs.*;
-import didatrade.configs.ConfigurationScheduler;
-
-import didatrade.DidaTradeMain;
-import didatrade.DidaTradePaxos;
 import didatrade.DidaTradePaxosServiceGrpc;
-
+import didatrade.configs.ConfigurationScheduler;
+import didatrade.core.TradeManager;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 
@@ -46,6 +41,7 @@ public class DidaTradeServerState {
     Thread                      main_loop_worker;
 	Applier                     applier;
     Thread                      applier_worker;
+	char 						schedule;
     
     public DidaTradeServerState(int port, int myself, char schedule) {
 	this.trade_manager    = new TradeManager();
@@ -66,6 +62,7 @@ public class DidaTradeServerState {
 	this.applier          = new Applier(this);
 	this.applier_worker   = new Thread(this.applier);
 	this.applier_worker.start();
+	this.schedule		  = schedule;
 
 	// populate manager
 	this.trade_manager.populate(DEFAULT_POPULATION);
@@ -169,6 +166,9 @@ public class DidaTradeServerState {
     }
 
 	public boolean isFast(int ballot) {
+		if (this.schedule == 'C'){
+			return this.scheduler.fastpaxos(ballot);
+		}
 	return getFastPaxosMode() && this.scheduler.fastpaxos(ballot);
 	}
 
