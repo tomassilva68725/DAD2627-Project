@@ -8,7 +8,7 @@ public class PaxosInstance {
     int command_id;
     int accepted_value;
     int write_ballot;
-    HashMap<Integer, HashMap<Integer, HashSet<Integer>>> votes;   // ballot -> valor -> acceptors
+    HashMap<Integer, HashMap<Integer, HashSet<Integer>>> votes;
     boolean decided;
     boolean value_is_locked;
 

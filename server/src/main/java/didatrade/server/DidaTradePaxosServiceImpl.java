@@ -171,13 +171,9 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 	    }
 
 	    if (already_decided) {
-		// instância já aprendida: os votos deixam de ser precisos
 		entry.votes.clear();
 	    }
 	    else {
-		// votos separados por BALLOT e por VALOR: um valor está escolhido quando um quórum
-		// de acceptors o aceitou no mesmo ballot, seja ele qual for (votos de ballots
-		// antigos que chegam atrasados continuam a contar)
 		HashMap<Integer, HashSet<Integer>> ballot_votes = entry.votes.get(ballot);
 		if (ballot_votes == null) {
 		    ballot_votes = new HashMap<Integer, HashSet<Integer>>();
@@ -188,7 +184,7 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 		    voters = new HashSet<Integer>();
 		    ballot_votes.put(value, voters);
 		}
-		voters.add(acceptor);   // é um Set: o mesmo acceptor só conta uma vez
+		voters.add(acceptor);
 		System.out.println("Paxos learner for instance " + instance + " ballot " + ballot + " : votes " + ballot_votes);
 
 		int needed = request.getFast() ? this.server_state.scheduler.fastquorum(ballot)
@@ -204,7 +200,6 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 		    entry.votes.clear();
 		}
 		else if (request.getFast()) {
-		    // colisão: nenhum valor ainda consegue chegar ao quórum rápido NESTE ballot
 		    int n_acceptors = this.server_state.scheduler.acceptors(ballot).size();
 		    int voted = 0, best = 0;
 		    for (HashSet<Integer> v : ballot_votes.values()) {

@@ -12,7 +12,6 @@ public class RequestHistory {
     private Hashtable<Integer, RequestRecord> pending;
     private Hashtable<Integer, RequestRecord> processed;
     
-    // A queue to keep track of the order of pending requests
     private ArrayDeque<Integer> pending_req_ids_queue;
 
     public RequestHistory() {
@@ -34,10 +33,6 @@ public class RequestHistory {
 	    return null;
     }
 
-    /**
-     * Takes the first pending request and removes it from the pending list.
-     * @return the first pending request record, or null if there are no pending requests
-     */
     public synchronized RequestRecord takeFirstPending() {
         Integer id = this.pending_req_ids_queue.poll();
         if (id != null) {

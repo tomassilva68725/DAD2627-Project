@@ -42,7 +42,6 @@ public class MainLoop implements Runnable  {
 			continue;
 		}
 
-		// Fast Paxos: num ballot F o líder não propõe pedidos; são os acceptors que os aceitam diretamente dos clientes
 		if (server_state.isFast(ballot)) {
 			waitForWork();
 			continue;
@@ -86,15 +85,12 @@ public class MainLoop implements Runnable  {
 	notify();    
     }
 
-	// Multi-Paxos: uma unica fase 1 por ballot, cobrindo todas as instancias a partir de "from"
 	private void takeOverAsLeader(int ballot) {
 
-		// Vertical Paxos: basta ler as configurações desde o último ballot COMPLETO
 		int low_ballot = Math.max(server_state.getCompletedBallot(), 0);
 		List<Integer> acceptors = server_state.scheduler.acceptorsinrange(low_ballot, ballot);
 		int n_acceptors = acceptors.size();
 
-		// state transfer: se a configuração muda, re-escreve o log TODO na configuração nova; senão, só o que falta
 		boolean new_config = !acceptors.equals(server_state.scheduler.acceptors(ballot));
 		int from = new_config ? 0 : server_state.applier.getNextApply();
 
@@ -131,7 +127,6 @@ public class MainLoop implements Runnable  {
 
 		this.next_log_entry.set(horizon - 1);
 
-		// tem de ser antes dos workers, senão o guard isPreparedFor manda-os embora
 		server_state.markPrepared(ballot);
 
 		List<Thread> workers = new ArrayList<Thread>();
@@ -142,7 +137,6 @@ public class MainLoop implements Runnable  {
 			t.start();
 		}
 
-		// Fast Paxos: a partir do horizon os acceptors aceitam valores diretamente dos clientes
 		if (server_state.isFast(ballot))
 			sendAny(ballot, horizon);
 
@@ -150,7 +144,6 @@ public class MainLoop implements Runnable  {
 			try { t.join(); } catch (InterruptedException e) {}
 		}
 
-		// todos os valores antigos ficaram escritos na configuração deste ballot: o ballot está COMPLETO
 		if (server_state.getCurrentBallot() == ballot) {
 			System.out.println("[" + System.currentTimeMillis() + "] Ballot " + ballot + " is COMPLETE (state transfer done)");
 			server_state.setCompletedBallot(ballot);
@@ -175,7 +168,7 @@ public class MainLoop implements Runnable  {
 
 		for (Map.Entry<Integer, Integer> c : count.entrySet()) {
 			if (c.getValue() >= threshold)
-				return c.getKey();                       // pode ter sido decidido no ballot rápido k: obrigatório
+				return c.getKey();
 			if (c.getValue() > best_count) {
 				best = c.getKey();
 				best_count = c.getValue();

@@ -42,13 +42,11 @@ public class InstanceWorker implements Runnable {
             } 
 
             if(server_state.scheduler.leader(ballot) != server_state.my_id) {
-                // Not the leader
                 giveBackRequest();
                 return;
             }
 
             if (!server_state.isPreparedFor(ballot)) {
-                // ballot mudou e ainda ninguém fez fase 1 para ele: o MainLoop trata disso
                 giveBackRequest();
                 return;
             }
@@ -61,7 +59,6 @@ public class InstanceWorker implements Runnable {
 
             System.out.println("[" + System.currentTimeMillis() + "] Instance " + this.instance + ": starting phase 2 with value " + value + " ballot " + ballot);
 
-            //Phase 2
             DidaTradePaxos.PhaseTwoRequest.Builder phase_two_request_builder = DidaTradePaxos.PhaseTwoRequest.newBuilder();
             phase_two_request_builder.setInstance(this.instance);
             phase_two_request_builder.setRequestballot(ballot);

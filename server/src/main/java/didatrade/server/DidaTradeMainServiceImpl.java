@@ -161,8 +161,6 @@ public class DidaTradeMainServiceImpl extends DidaTradeMainServiceGrpc.DidaTrade
 	// for debug purposes
 	System.out.println("reqid " + reqid + " userid " + uid);
 
-	// Step 4: balance SEM Paxos. Esta réplica só responde depois de ter executado
-	// tudo o que o cliente já viu (lastseen).
 	if (this.server_state.causal_balance) {
 	    int[] r = this.server_state.applier.causalBalance(uid, request.getLastseen());
 	    System.out.println("Causal balance for user " + uid + " (lastseen " + request.getLastseen() + ") = " + r[0] + " at index " + r[1]);

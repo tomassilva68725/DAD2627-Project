@@ -32,7 +32,6 @@ public class Applier implements Runnable {
                 decided = entry.decided;
             }
             if (!decided) {
-                // Fast Paxos: sem decisão nem colisão visível ao fim do timeout -> recuperação no ballot seguinte
                 if (server_state.getCurrentBallot() == ballot && server_state.isFast(ballot)
                     && server_state.req_history.getFirstPending() != null) {
                     System.out.println("Fast Paxos timeout on instance " + this.next_apply.get() + " -> moving to ballot " + (ballot + 1));
@@ -66,7 +65,6 @@ public class Applier implements Runnable {
         markExecuted(index); 
     }
 
-    // Step 4: avança o contador de instâncias executadas 
     private void markExecuted(int index) {
         synchronized (server_state.trade_manager) {
             if (index > this.executed)
@@ -75,7 +73,6 @@ public class Applier implements Runnable {
         }
     }
 
-    // Step 4: balance SEM Paxos. Espera até esta réplica ter executado pelo menos 'lastseen' instâncias *rever
     public int[] causalBalance(int user_id, int lastseen) {
         synchronized (server_state.trade_manager) {
             while (this.executed < lastseen) {

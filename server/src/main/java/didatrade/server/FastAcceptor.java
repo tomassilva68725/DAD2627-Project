@@ -35,7 +35,6 @@ public class FastAcceptor {
             this.any_ballot         = ballot;
             this.next_fast_instance = from;
             this.assigned.clear();
-            // pedidos que já tinham chegado antes do ANY
             for (int reqid : server_state.req_history.pendingIdsSorted()) {
                 int[] vote = assignLocked(reqid);
                 if (vote != null)
